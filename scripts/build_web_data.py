@@ -17,7 +17,7 @@ DST = ROOT / "web" / "js" / "layout-data.js"
 
 # 経路計算と概略図に要るものだけ。ジャンル配置表は Web 版では使わないので載せない
 # (配布物を必要最小限に保つ)。
-KEYS = ("event", "dates", "venue", "precision", "note",
+KEYS = ("event", "dates", "venue", "hours", "precision", "note",
         "params", "transfer_minutes", "zones")
 
 

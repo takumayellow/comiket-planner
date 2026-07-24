@@ -21,6 +21,13 @@ const SAMPLE = [
   '東ア86-88 *4 島の奥は後回し',
 ].join('\n');
 
+// 開会/閉会は公式発表の転記 (data/layout/c108.json の hours)。C108 の出展サークルは
+// 両日とも 10:30〜16:00 なので、「帰る時刻」に 16:00 より後は入れさせない。
+const OPEN = LAYOUT_DOC.hours?.circles_open || '10:30';
+const CLOSE = LAYOUT_DOC.hours?.circles_close || '16:00';
+const OPEN_MIN = hhmmToMin(OPEN);
+const CLOSE_MIN = hhmmToMin(CLOSE);
+
 let state = { plan: null, groups: new Map(), done: new Set(), unparsed: [] };
 
 // ---------- 保存 ----------
@@ -49,13 +56,15 @@ function saveDone() {
 function restore() {
   const get = (k, d = null) => ls(() => localStorage.getItem(`${LS}${k}`), d);
   $('#text').value = get('text') ?? SAMPLE;
-  $('#start').value = get('start') || '11:20';
+  $('#start').value = get('start') || OPEN;
   $('#brk').value = get('brk') ?? '';
-  // 旧版は「使える時間(分)」で保存していた。帰る時刻に読み替えて引き継ぐ
+  // 旧版は「使える時間(分)」で保存していた。帰る時刻に読み替えて引き継ぐ。
+  // 既定は閉会時刻。会場が閉まる以上「無制限」という状態は存在しない
   const oldBudget = parseInt(get('budget') ?? '', 10);
   $('#end').value = get('end')
-    ?? (Number.isFinite(oldBudget)
-      ? minToHhmm(hhmmToMin($('#start').value) + oldBudget) : '');
+    || (Number.isFinite(oldBudget)
+      ? minToHhmm(Math.min(hhmmToMin($('#start').value) + oldBudget, CLOSE_MIN))
+      : CLOSE);
   $('#zone').value = get('zone') ?? '';
   const g = get('grp');
   $('#grp').checked = g === null ? true : g === '1';
@@ -66,36 +75,50 @@ function restore() {
 // ---------- 使える時間 ----------
 // 「何分使えるか」を人が数えるのは面倒なので、帰る時刻から逆算する。
 // 昼食・休憩はここで先に取り分けておく (巡回の途中でどこで食べるかは決めない)。
+// 開会前・閉会後は物理的に回れないので、開催時間の外は必ず内側へ丸める。
 
 function budgetInfo() {
-  const startMin = hhmmToMin($('#start').value || '11:20');
-  const endRaw = $('#end').value;
+  const rawStart = hhmmToMin($('#start').value || OPEN);
+  const startMin = Math.min(Math.max(rawStart, OPEN_MIN), CLOSE_MIN);
   const brk = Math.max(0, parseInt($('#brk').value, 10) || 0);
-  if (!endRaw) return { budget: null, startMin, brk, endMin: null, bad: false };
-
-  let endMin = hhmmToMin(endRaw);
-  // 日をまたぐ入力 (23:00 → 01:00) は誤入力とみなさず素直に翌日として扱う
-  if (endMin <= startMin) endMin += 24 * 60;
+  // 空欄は「無制限」ではなく閉会。会場は必ず閉まる
+  const rawEnd = $('#end').value ? hhmmToMin($('#end').value) : CLOSE_MIN;
+  const endMin = Math.min(Math.max(rawEnd, startMin), CLOSE_MIN);
   const budget = endMin - startMin - brk;
-  return { budget: budget > 0 ? budget : null, startMin, brk, endMin,
-    bad: budget <= 0 };
+  return {
+    startMin,
+    endMin,
+    brk,
+    budget: budget > 0 ? budget : null,
+    bad: budget <= 0,
+    cappedStart: rawStart < OPEN_MIN,
+    cappedEnd: rawEnd > CLOSE_MIN,
+    inverted: rawEnd < startMin,
+  };
 }
 
 function renderBudgetNote() {
   const b = budgetInfo();
   const el = $('#budgetNote');
+  const fix = [];
+  if (b.cappedStart) {
+    fix.push(`開会は <b>${OPEN}</b> なので、そこから回りはじめる前提で計算します。`);
+  }
+  if (b.cappedEnd) {
+    fix.push(`サークルの頒布は <b>${CLOSE}</b> で終わります。それより後は指定できません。`);
+  }
+  if (b.inverted) {
+    fix.push('<b class="warn">帰る時刻が回りはじめより前です。</b>');
+  }
   if (b.bad) {
-    el.innerHTML = '<b class="warn">休憩が長すぎて回る時間が残りません。</b>'
+    el.innerHTML = `${fix.join('')}<b class="warn">回る時間が残りません。</b>`
       + '帰る時刻か休憩の分数を見直してください。';
     return;
   }
-  if (b.budget === null) {
-    el.textContent = '帰る時刻を入れると、そこに収まるところまでで切り上げた巡回順を組みます。';
-    return;
-  }
-  el.textContent = `${$('#start').value} → ${$('#end').value} のうち`
+  el.innerHTML = fix.join('')
+    + `${minToHhmm(b.startMin)} → ${minToHhmm(b.endMin)} のうち`
     + (b.brk ? `昼食・休憩 ${b.brk}分 を取り分けた` : '')
-    + ` ${b.budget}分 で回ります。入りきらない分は「時間内に入らず外した」に出します。`;
+    + ` <b>${b.budget}分</b> で回ります。入りきらない分は「時間内に入らず外した」に出します。`;
 }
 
 // ---------- 計算 ----------
@@ -117,7 +140,7 @@ function compute() {
 
   const plan = planRoute(reps, layout, {
     startZone: $('#zone').value || null,
-    startTime: $('#start').value || '11:20',
+    startTime: minToHhmm(b.startMin),   // 開会前を指定されていても開会時刻から回る
     timeBudgetMin: b.budget,
   });
   for (const s of plan.stops) s.wall = layout.isWall(s.placement.block);
@@ -157,12 +180,10 @@ function render(unparsed = state.unparsed) {
     <div><b>${pyRound(walkTotal)}</b><small>うち移動(分)</small></div>`;
 
   // 帰る時刻に対してどれだけ余っているか (立ち止まって迷える時間)
-  const slack = b.endMin === null ? null : b.endMin - endMin;
-  const leave = b.endMin === null ? '' : `帰る <b>${minToHhmm(b.endMin)}</b>`
+  const slack = b.endMin - endMin;
+  const leave = `帰る <b>${minToHhmm(b.endMin)}</b>`
     + `${b.brk ? `（昼食・休憩 ${b.brk}分 を含む）` : ''}`;
-  if (slack === null) {
-    $('#slack').textContent = '帰る時刻を入れると、そこに収まるところまでで切り上げます。';
-  } else if (slack < 0) {
+  if (slack < 0) {
     // 休憩が長すぎて回る時間が残らなかったとき。時間制限なしの巡回順を出している
     $('#slack').innerHTML = `${leave} を <b class="warn">${-slack}分 超えます。</b>`
       + '休憩の分数を減らすか、帰る時刻を遅くしてください。';
@@ -275,9 +296,15 @@ function esc(s) {
 
 // ---------- 起動 ----------
 
+// 開催時間は公式発表なので、入力欄の可動域もデータから決める (HTML に直書きしない)
+for (const id of ['#start', '#end']) {
+  $(id).min = OPEN;
+  $(id).max = CLOSE;
+}
 restore();
 renderBudgetNote();
 $('#meta').innerHTML = `${esc(LAYOUT_DOC.event || '')}<br>${esc(LAYOUT_DOC.venue || '')}`;
+$('#hours').textContent = `サークル ${OPEN}〜${CLOSE}`;
 if ($('#text').value.trim()) compute();
 
 $('#go').addEventListener('click', compute);

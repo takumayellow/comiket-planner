@@ -5,6 +5,12 @@
     "2026-08-16"
   ],
   "venue": "東京ビッグサイト",
+  "hours": {
+    "circles_open": "10:30",
+    "circles_close": "16:00",
+    "note": "出展サークルの頒布時間。企業ブースは1日目のみ17:00まで、2日目は16:00。",
+    "source": "https://www.comiket.co.jp/info-a/C108/C108Info.html"
+  },
   "precision": "approximate",
   "note": "座標は歩行時間見積もり用の近似モデル。ブロック記号とホール対応は公式発表の転記。",
   "params": {

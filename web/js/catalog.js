@@ -118,14 +118,3 @@ export function parseLine(line) {
   }
   return { placements, priority, label };
 }
-
-/** 複数行テキストをまとめて解析し、行ごとの結果も返す。 */
-export function parseText(text) {
-  const lines = [];
-  for (const rawLine of text.split(/[\n;]/)) {
-    if (!rawLine.trim()) continue;
-    const r = parseLine(rawLine);
-    lines.push({ raw: rawLine.trim(), ...r });
-  }
-  return lines;
-}

@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from comiket_planner import load_layout, parse_placement, parse_placements, plan_route
 from comiket_planner.catalog import parse_line
+from comiket_planner.freeform import parse_free_text
 
 
 def test_parse_single():
@@ -95,3 +96,49 @@ def test_priority_marker_without_separator_and_fullwidth():
     assert parse_line("西あ36 *2ホロライブ")[1:] == (2, "ホロライブ")
     assert parse_line("東Ｈ０７　＊２　ホロライブ")[1:] == (2, "ホロライブ")
     assert parse_line("西あ３６ *2 ごちうさ")[1:] == (2, "ごちうさ")
+
+
+# ---- 自由文 (freeform) ----
+# 「1行1件」「*3 で優先度」という書式を守らせないための層。書式が崩れた入力ほど
+# 移植差・退行が出やすいので、代表的な崩れ方を固定しておく。
+
+
+def test_freeform_splits_run_on_speech():
+    entries = parse_free_text(
+        "西のあ36の○○が絶対欲しい、あと東H07も。南q06,10,16は余裕があれば")
+    assert [e.priority for e in entries] == [1, 3, 4]
+    assert [len(e.placements) for e in entries] == [1, 1, 3]
+    assert entries[0].placements[0].district == "西"
+    assert entries[2].cue == "余裕があれば"
+
+
+def test_freeform_priority_prefers_stronger_cue():
+    # 「絶対」(強さ4) > 「欲しい」(2) / 「余裕があれば」(5) > 「欲しい」(2)
+    assert parse_free_text("東H07 絶対欲しい")[0].priority == 1
+    assert parse_free_text("東H07 余裕があれば欲しい")[0].priority == 4
+    assert parse_free_text("東H07 ホロライブ")[0].priority == 3
+
+
+def test_freeform_explicit_marker_wins():
+    e = parse_free_text("東H07 絶対欲しい *4")[0]
+    assert e.priority == 4 and e.explicit is True
+
+
+def test_freeform_district_not_taken_from_prose():
+    # 「東方Project」の東を配置の地区にしてはいけない
+    e = parse_free_text("東方Projectのサークルが西R12bにいるので必ず行く")[0]
+    assert e.placements[0].district == "西"
+    assert e.priority == 1
+
+
+def test_freeform_line_break_is_a_hard_boundary():
+    entries = parse_free_text("西す23 *4 五等分の花嫁\n何も配置がわからないメモ")
+    assert len(entries) == 2
+    assert entries[1].placements == []
+
+
+def test_freeform_label_drops_place_and_particle():
+    e = parse_free_text("西のあ36のごちうさ")[0]
+    assert e.label == "ごちうさ"
+    # 助詞は1文字だけ落とす (作品名の先頭を削らない)
+    assert parse_free_text("東H07 のんのんびより")[0].label == "のんのんびより"

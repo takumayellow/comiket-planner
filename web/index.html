@@ -32,17 +32,36 @@
 <main>
   <div class="col-in">
     <section>
-      <h2>行きたいリスト <span>1行に1件</span></h2>
-      <textarea id="text" spellcheck="false" aria-label="行きたいリスト"></textarea>
+      <h2>行きたいリスト <span>しゃべるか、まとめて貼るだけ</span></h2>
+
+      <div class="mic" id="mic" hidden>
+        <button class="btn-mic" type="button" id="micBtn" aria-pressed="false">
+          <i></i><span id="micLabel">声で入れる</span>
+        </button>
+        <span class="mic__live" id="micLive" aria-live="polite"></span>
+      </div>
+
+      <textarea id="text" spellcheck="false" aria-label="行きたいリスト"
+        placeholder="例: 西のあ36の○○が絶対欲しい、あと東H07も。南のq06,10,16は余裕があれば"></textarea>
       <div class="samples">
         <button type="button" data-fill="sample">記入例を入れる</button>
         <button type="button" data-fill="clear">全部消す</button>
       </div>
       <p class="hint">
-        書き方: <b>西あ36 *2 サークル名メモ</b> ／ 地区(東・西・南)＋ブロック記号＋番号。
-        <b>*1〜*5</b> が優先度（1＝最優先、既定は3）。残りはメモとして表示します。
-        <b>あ36-39</b> のような範囲、<b>あ36,38,39</b> の列挙もそのまま書けます。
+        <b>改行も記号も要りません。</b>思いついた順にそのまま書いて（しゃべって）ください。
+        地区(東・西・南)＋ブロック記号＋番号を見つけて1件ずつに切り分け、
+        <b>「絶対」「できれば」「ついでに」</b>のような言い方から優先度を推し量ります。
+        <b>あ36-39</b> の範囲、<b>あ36,38,39</b> の列挙も読みます。
+        優先度を自分で決めたいときは <b>*1〜*5</b> と書けばそちらが優先されます。
       </p>
+
+      <div class="read" id="read" hidden>
+        <div class="read__head">
+          <b>読み取り結果</b>
+          <span>優先度はこちらで推定しています。違っていれば直してください</span>
+        </div>
+        <div id="readList"></div>
+      </div>
 
       <div class="fields">
         <div>
@@ -124,7 +143,9 @@
 
   <footer class="grid-full">
     <b>計算はすべてこの端末の中で完結します。</b>入力したリストはサーバへ送信されず、端末内（localStorage）にだけ保存されます。
-    一度開けば通信がなくても動くので、会場で圏外になっても使えます。<br>
+    一度開けば通信がなくても動くので、会場で圏外になっても使えます。
+    ただし<b>音声入力を使ったときだけ</b>は例外で、ブラウザ内蔵の音声認識が働くため、音声がブラウザ提供元のサーバへ送られる場合があります
+    （文字になった後の処理はすべて端末内です）。圏外では音声入力だけが使えません。<br>
     サークル名のデータベースは持っていません（配置は自分で調べて入力してください）。会場の概略図は公式の地図を複製したものではなく、
     ホール寸法などから独自に組んだ位置モデルです。待機列・入場口・配置の最終確認は必ず公式の発表で行ってください。<br>
     移動と滞在の見積りは「大半の島は並ばずに数分、行列ができるのは一部だけ」という前提のモデルです。実際の行列は状況で大きく変わります。

@@ -22,7 +22,7 @@
         { "key": "X-Frame-Options", "value": "DENY" },
         {
           "key": "Permissions-Policy",
-          "value": "geolocation=(), microphone=(), camera=(), usb=(), payment=(), interest-cohort=()"
+          "value": "geolocation=(), microphone=(self), camera=(), usb=(), payment=(), interest-cohort=()"
         },
         {
           "key": "Content-Security-Policy",

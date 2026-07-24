@@ -3,23 +3,22 @@
 
 import { LAYOUT_DOC } from './layout-data.js';
 import { Layout } from './layout.js';
-import { parseText } from './catalog.js';
+import { parseFreeText } from './freeform.js';
+import { placementKey } from './catalog.js';
 import { groupByBlock, noGrouping, formatNumbers } from './group.js';
 import { planRoute, pyRound, hhmmToMin, minToHhmm } from './router.js';
 import { renderMap, priorityClass } from './map.js';
+import { isSupported as micOk, createRecorder } from './voice.js';
 
 const $ = (s) => document.querySelector(s);
 const LS = 'cp.';
 const layout = new Layout(LAYOUT_DOC);
 
-// 初回訪問はこれを入れておく (書き方が一目で分かるように)
-const SAMPLE = [
-  '西あ36 *2 壁は完売が早いので優先2',
-  '西せ9-15 *3 範囲で書くと島ごと拾う',
-  '南q06,10,16 *4 番号の列挙もできる',
-  '東H07 *2',
-  '東ア86-88 *4 島の奥は後回し',
-].join('\n');
+// 初回訪問はこれを入れておく。書式の説明ではなく「こう書き殴っていい」の実例にする
+// (整った箇条書きを見せると、それを守らないといけないと思われる)。
+const SAMPLE = '西のあ36の壁サークルが絶対欲しい、あと東H07のホロライブも。'
+  + '西せ9-15のあたりは時間があれば見たい\n'
+  + '南q06,10,16はついでで大丈夫。東ア86-88は余裕があれば';
 
 // 開会/閉会は公式発表の転記 (data/layout/c108.json の hours)。C108 の出展サークルは
 // 両日とも 10:30〜16:00 なので、「帰る時刻」に 16:00 より後は入れさせない。
@@ -28,7 +27,14 @@ const CLOSE = LAYOUT_DOC.hours?.circles_close || '16:00';
 const OPEN_MIN = hhmmToMin(OPEN);
 const CLOSE_MIN = hhmmToMin(CLOSE);
 
-let state = { plan: null, groups: new Map(), done: new Set(), unparsed: [] };
+let state = {
+  plan: null,
+  groups: new Map(),
+  done: new Set(),
+  unparsed: [],
+  entries: [],
+  prio: new Map(),   // 推定に納得いかないときの手動上書き (配置キー → 優先度)
+};
 
 // ---------- 保存 ----------
 // localStorage は「使えない」ことがある (プライベートモード / Cookie ブロック /
@@ -53,6 +59,11 @@ function saveDone() {
   ls(() => localStorage.setItem(`${LS}done`, JSON.stringify([...state.done])));
 }
 
+function savePrio() {
+  ls(() => localStorage.setItem(`${LS}prio`,
+    JSON.stringify(Object.fromEntries(state.prio))));
+}
+
 function restore() {
   const get = (k, d = null) => ls(() => localStorage.getItem(`${LS}${k}`), d);
   $('#text').value = get('text') ?? SAMPLE;
@@ -70,6 +81,8 @@ function restore() {
   $('#grp').checked = g === null ? true : g === '1';
   state.done = ls(() => new Set(JSON.parse(get('done') || '[]')), new Set())
     || new Set();
+  state.prio = ls(() => new Map(Object.entries(JSON.parse(get('prio') || '{}'))
+    .map(([k, v]) => [k, Number(v)])), new Map()) || new Map();
 }
 
 // ---------- 使える時間 ----------
@@ -121,12 +134,70 @@ function renderBudgetNote() {
     + ` <b>${b.budget}分</b> で回ります。入りきらない分は「時間内に入らず外した」に出します。`;
 }
 
+// ---------- 読み取り ----------
+// 優先度は文面から推定する。推定である以上外すことがあるので、
+// 「何をどう読んだか」と「どの言葉を根拠にしたか」を必ず画面に出して、
+// その場で直せるようにする (黙って推定して黙って使うことはしない)。
+
+function readEntries() {
+  const entries = parseFreeText($('#text').value);
+  for (const e of entries) {
+    e.key = e.placements.map(placementKey).join(',');
+    const ov = e.key ? state.prio.get(e.key) : null;
+    if (ov) {
+      e.inferred = e.priority;
+      e.priority = ov;
+      e.overridden = true;
+      for (const p of e.placements) p.priority = ov;
+    }
+  }
+  state.entries = entries;
+  return entries;
+}
+
+function readRow(e) {
+  if (!e.placements.length) {
+    return `<div class="rd bad">
+      <span class="rd__loc">？</span>
+      <span class="rd__lab">${esc(e.raw)}</span>
+      <span class="rd__cue">場所を読み取れませんでした</span></div>`;
+  }
+  const p = e.placements[0];
+  const hall = layout.hallOf(p.block, p.number) || p.district || '';
+  const nums = formatNumbers(e.placements.map((x) => x.number));
+  const col = priorityClass(e.priority);
+  const opts = [1, 2, 3, 4, 5].map((n) => `<option value="${n}"`
+    + `${n === e.priority ? ' selected' : ''}>優先${n}</option>`).join('');
+  const cue = e.overridden ? `手で変更（推定は優先${e.inferred}）`
+    : e.explicit ? `「${esc(e.cue)}」と書いてある`
+      : e.cue ? `「${esc(e.cue)}」から` : '手がかりが無いので既定';
+  return `<div class="rd">
+    <span class="rd__loc ${col}">${esc(hall)} ${esc(p.block)}${esc(nums)}</span>
+    <span class="rd__lab">${esc(e.label || '—')}</span>
+    <span class="rd__cue">${cue}</span>
+    <select class="rd__sel" data-k="${esc(e.key)}" aria-label="優先度">${opts}</select>
+  </div>`;
+}
+
+function renderRead(entries = readEntries()) {
+  $('#read').hidden = !entries.length;
+  $('#readList').innerHTML = entries.map(readRow).join('');
+  for (const sel of document.querySelectorAll('.rd__sel')) {
+    sel.addEventListener('change', () => {
+      state.prio.set(sel.dataset.k, parseInt(sel.value, 10));
+      savePrio();
+      if (state.plan) compute(); else renderRead();
+    });
+  }
+  return entries;
+}
+
 // ---------- 計算 ----------
 
 function compute() {
-  const lines = parseText($('#text').value);
-  const placements = lines.flatMap((l) => l.placements);
-  const unparsed = lines.filter((l) => !l.placements.length).map((l) => l.raw);
+  const entries = renderRead();
+  const placements = entries.flatMap((e) => e.placements);
+  const unparsed = entries.filter((e) => !e.placements.length).map((e) => e.raw);
 
   if (!placements.length) {
     state.plan = null;
@@ -309,6 +380,12 @@ if ($('#text').value.trim()) compute();
 
 $('#go').addEventListener('click', compute);
 $('#text').addEventListener('change', save);
+// 打ち込み/貼り付けの途中で巡回順まで作り直すと重いので、読み取り結果だけ追う
+let typing = null;
+$('#text').addEventListener('input', () => {
+  clearTimeout(typing);
+  typing = setTimeout(() => { save(); renderRead(); }, 250);
+});
 for (const id of ['#start', '#end', '#brk', '#zone', '#grp']) {
   $(id).addEventListener('change', () => {
     renderBudgetNote();
@@ -341,6 +418,41 @@ $('#zoomBtn').addEventListener('click', () => {
   const on = $('#mapwrap').classList.toggle('zoom');
   $('#zoomBtn').textContent = on ? '縮小' : '拡大';
 });
+
+// 音声入力 (対応ブラウザのみ)。喋った分は末尾に足していくだけで、
+// 切り分けと優先度の判定はテキストと同じ経路に通す。
+if (micOk()) {
+  $('#mic').hidden = false;
+  const live = $('#micLive');
+  // 認識中の途中経過とエラー文言が同じ場所を取り合う。エラーは次に押すまで消さない
+  // (エラー直後に end イベントが来るので、素直に書くと一瞬で消えて原因が分からない)。
+  let msg = '';
+  const rec = createRecorder({
+    onFinal: (t) => {
+      if (!t) return;
+      const cur = $('#text').value;
+      $('#text').value = cur && !/\n$/.test(cur) ? `${cur}\n${t}` : cur + t;
+      save();
+      renderRead();
+    },
+    onInterim: (t) => { live.textContent = t || msg; },
+    onState: (s) => {
+      const on = s === 'on';
+      $('#micBtn').classList.toggle('on', on);
+      $('#micBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
+      $('#micLabel').textContent = on ? '録音中 — 押すと止める' : '声で入れる';
+      if (on) { msg = ''; live.textContent = ''; }
+    },
+    onError: (m) => { msg = m; live.textContent = m; },
+  });
+  $('#micBtn').addEventListener('click', () => (rec.active ? rec.stop() : rec.start()));
+} else {
+  // 非対応 (iOS の一部 / Firefox)。キーボードのマイクキーなら同じことができる
+  $('#mic').hidden = false;
+  $('#micBtn').hidden = true;
+  $('#micLive').textContent = 'このブラウザは音声入力に対応していません。'
+    + 'キーボードのマイクのキーから声で入力できます。';
+}
 
 // ホーム画面に追加 (対応ブラウザのみ)
 let deferred = null;

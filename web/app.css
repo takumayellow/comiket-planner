@@ -250,6 +250,123 @@ button {
   padding: 6px 11px;
 }
 
+/* ---------- 音声入力 ---------- */
+
+.mic { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+
+.btn-mic {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  color: var(--ai-dk);
+  border: 2px solid var(--ai);
+  padding: 12px 18px;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+}
+
+/* マイクの絵。アイコン画像を足さずに CSS だけで作る (先読みするファイルを増やさない)。
+   i 本体=マイク、::before=受け皿の弧、::after=支柱と台座。色は currentColor に
+   任せて、押されている間 (.on) の白抜きを1箇所の指定で済ませる。 */
+.btn-mic i {
+  position: relative;
+  width: 10px;
+  height: 13px;
+  margin: 0 4px 9px;
+  border-radius: 5px;
+  background: currentColor;
+}
+
+.btn-mic i::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 6px;
+  width: 18px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+
+.btn-mic i::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 16px;
+  width: 12px;
+  height: 4px;
+  border-bottom: 2px solid currentColor;
+  background: linear-gradient(currentColor, currentColor) center top / 2px 100% no-repeat;
+}
+
+.btn-mic.on { background: var(--shu); border-color: var(--shu); color: #fff; }
+
+.mic__live { font-size: 13.5px; color: var(--sumi2); flex: 1 1 180px; min-width: 0; }
+
+/* ---------- 読み取り結果 ---------- */
+/* 優先度は推定なので、根拠と結果を並べて出して、その場で直せるようにする */
+
+.read { margin-top: 14px; border: 1px solid var(--rule2); background: var(--card); }
+
+.read__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper2);
+}
+
+.read__head b { font-size: 13.5px; letter-spacing: 0.08em; }
+.read__head span { font-size: 12px; color: var(--sumi3); }
+
+.rd {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.rd:last-child { border-bottom: 0; }
+
+.rd__loc {
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.rd__loc.p12 { color: var(--shu); }
+.rd__loc.p3 { color: var(--ai); }
+.rd__loc.p45 { color: var(--sumi2); }
+
+.rd__lab {
+  font-size: 14px;
+  color: var(--sumi2);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.rd__cue { grid-column: 2; font-size: 12px; color: var(--sumi3); }
+
+.rd__sel {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  width: auto;
+  margin: 0;
+  padding: 7px 6px;
+  font-size: 14px;
+}
+
+.rd.bad { background: #fbf3f3; }
+.rd.bad .rd__loc { color: var(--shu); }
+.rd.bad .rd__cue { color: var(--shu); grid-column: 2 / span 2; }
+
 /* ---------- サマリー ---------- */
 
 .summary {
@@ -300,10 +417,12 @@ button {
 }
 
 /* 優先度の色。CSP(style-src 'self') で style="" 属性が効かないので、
-   色は必ずクラスで当てる。JS 側 stopColor() と対応させること。 */
-.p12 { background: var(--shu); }
-.p3 { background: var(--ai); }
-.p45 { background: var(--sumi2); }
+   色は必ずクラスで当てる。JS 側 stopColor() と対応させること。
+   塗りが欲しいのは凡例の丸と巡回順の記号だけ。無条件に .p12 へ background を
+   当てると、同じクラスを文字色に使う .rd__loc が地と同色に潰れる。 */
+.legend i.p12, .stop__sym.p12 { background: var(--shu); }
+.legend i.p3, .stop__sym.p3 { background: var(--ai); }
+.legend i.p45, .stop__sym.p45 { background: var(--sumi2); }
 .legend i.wallmark { background: var(--card); box-shadow: inset 0 0 0 2px var(--sumi); }
 
 /* ---------- 巡回順 ---------- */

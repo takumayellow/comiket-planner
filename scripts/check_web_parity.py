@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from comiket_planner.catalog import parse_line  # noqa: E402
+from comiket_planner.freeform import parse_free_text  # noqa: E402
 from comiket_planner.layout import load_layout  # noqa: E402
 from comiket_planner.router import plan_route  # noqa: E402
 
@@ -28,6 +29,13 @@ CASES = [
     "西め37 *4",
     "西す23 *3 五等分の花嫁",
 ]
+
+# 自由文の切り分けと優先度推定 (freeform)。書式を守らない入力こそ移植差が出やすい
+FREE = """西のあ36の○○が絶対欲しい、あと東H07も。南q06,10,16は余裕があれば
+きくりのあ38,39は本命。西せ9-15あたりは時間があれば見たい あと東ア86-88はついででいいや
+東方Projectのサークルが西R12bにいるらしいので必ず行く それから南q06 冷やかし
+のんのんびよりの新刊が東H07にあるはず 西め37は優先2 西す23 *4 五等分の花嫁
+何も配置がわからないメモ"""
 
 RUNS = {
     "west_free": {"start_zone": "west12", "start_time": "11:20", "time_budget_min": None},
@@ -45,6 +53,9 @@ def main() -> None:
         "n_parsed": len(placements),
         "parsed": [f"{p.district}{p.block}{p.number}{p.ab}|{p.priority}|{p.label}"
                    for p in placements],
+        "free": [f"{e.raw}|{e.priority}|{e.cue}|{e.label}|"
+                 + ",".join(f"{p.district}{p.block}{p.number}{p.ab}" for p in e.placements)
+                 for e in parse_free_text(FREE)],
         "runs": {},
     }
     for name, opt in RUNS.items():

@@ -13,23 +13,26 @@ const PAD = 26;
 const GAP_IN = 32;   // 同じ棟のホール間
 const GAP_GRP = 50;  // 棟と棟の間
 
+// 公式の折り込み地図は白い紙にスミ一色 (彩度のある画素 0.00% を実測) なので、それに寄せる。
+// 棟の見出しだけ準備会サイトの藍。app.css の :root と対で管理すること。
 const C = {
-  zone: '#141416',
-  zoneEdge: '#33333a',
-  island: '#43434b',
-  islandHit: '#8b8b96',
-  wall: '#6d6d78',
-  wallHit: '#c9c4b8',
-  code: '#f4f1ea',
-  label: '#8f8a80',
-  row: '#e60012',
-  link: '#63636d',
+  paper: '#f4f1ea',
+  zone: '#ffffff',
+  zoneEdge: '#a2a0a0',
+  island: '#c9c8c8',
+  islandHit: '#595757',
+  wall: '#918b8a',
+  wallHit: '#231815',
+  code: '#231815',
+  label: '#595757',
+  row: '#444499',
+  link: '#a2a0a0',
 };
 
 export function stopColor(priority) {
-  if (priority <= 2) return '#e60012';
-  if (priority === 3) return '#e8a317';
-  return '#4a90d9';
+  if (priority <= 2) return '#b7282e';
+  if (priority === 3) return '#444499';
+  return '#595757';
 }
 
 /** HTML 側で使う色クラス。app.css の .p12/.p3/.p45 と対。 */
@@ -84,7 +87,7 @@ export function renderMap(layout, plan) {
   const out = [];
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${r(totalW)} ${r(totalH)}" `
     + 'role="img" aria-label="会場の概略図と巡回順">');
-  out.push(`<rect width="${r(totalW)}" height="${r(totalH)}" fill="#0b0b0d"/>`);
+  out.push(`<rect width="${r(totalW)}" height="${r(totalH)}" fill="${C.paper}"/>`);
 
   for (const b of bands) {
     out.push(`<rect x="${PAD - 17}" y="${r(b.top - 22)}" width="3.5" `
@@ -131,12 +134,12 @@ export function renderMap(layout, plan) {
     const up = yy > place.get(s.point.zone).y + 12;
     const ty = up ? yy - 12.5 : yy + 20;
     out.push(`<text x="${r(x)}" y="${r(ty)}" fill="${C.code}" font-size="13" `
-      + `font-weight="700" text-anchor="middle" stroke="#0b0b0d" stroke-width="2.6" `
+      + `font-weight="700" text-anchor="middle" stroke="${C.paper}" stroke-width="2.6" `
       + `paint-order="stroke">${esc(s.placement.block)}</text>`);
     out.push(`<circle cx="${r(x)}" cy="${r(yy)}" r="8.6" `
       + `fill="${stopColor(s.placement.priority)}"`
-      + `${s.wall ? ' stroke="#f4f1ea" stroke-width="2"' : ''}/>`);
-    out.push(`<text x="${r(x)}" y="${r(yy + 3.5)}" fill="#0b0b0d" font-size="10" `
+      + `${s.wall ? ' stroke="#231815" stroke-width="2"' : ''}/>`);
+    out.push(`<text x="${r(x)}" y="${r(yy + 3.5)}" fill="#ffffff" font-size="10" `
       + `font-weight="700" text-anchor="middle">${i + 1}</text>`);
   });
 

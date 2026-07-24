@@ -1,27 +1,33 @@
-/* コミケカタログ/会場地図の質感: 黒×赤、太ゴシック、直線、高い情報密度。
-   会場は照明が暗く、立ったまま片手で見るので:
+/* 配色はコミケ公式の一次ソースから採った (色を「それっぽく」創作しない):
+     - C108 折り込み地図 (comiket.co.jp/info-a/C108/images/C108CtlgMapAll.png) は
+       彩度のある画素が 0.00%。白い紙 + 印刷のスミ #231815 + グレー #595757/#918b8a/
+       #a2a0a0/#c9c8c8 だけで刷られている。カタログ本体も同じ「紙に黒一色」。
+     - 準備会公式サイト (comiket.co.jp/top/style.css) の唯一の色みが藍紫
+       #444499 / #5555aa / #6666bb / #000066 / #dfdfff。これがコミケのブランド色。
+   よって「紙＋スミ＋藍」が基調。朱 (--shu) は警告と最優先だけの差し色に留める。
+
+   会場は屋外・炎天下で片手で見るので:
    - 本文 17px を基準にする (小さい字は会場でまず読めない)
    - 入力欄は 16px 以上。iOS はこれ未満だとフォーカス時に勝手にズームする
-   - 副次テキストも彩度を落としすぎない (灰色が沈むと読めなくなる) */
+   - 紙地なので直射日光下でも沈まない */
 
 :root {
-  --ink: #0d0d10;
-  --ink2: #17171c;
-  --ink3: #212128;
-  --line: #33333d;
-  --line2: #4a4a57;
-  --paper: #f7f4ee;
-  --dim: #c3bcb0;    /* 副次テキスト。本文に対して十分明るく保つ */
-  --dim2: #9a9389;   /* 三次テキスト。これ以上暗くしない */
-  --red: #e60012;    /* 公式カタログの赤 */
-  --red-lt: #ff5a66; /* 暗背景の上で文字に使う赤 */
-  --red-dk: #a3000d;
-  --amber: #f2a93b;
-  --blue: #5b9dee;
-  --green: #3fb36b;
+  --paper: #f4f1ea;  /* カタログ本文の再生紙 */
+  --paper2: #eae6dc; /* 一段沈めた紙 (入力欄の下地・帯) */
+  --card: #ffffff;   /* 折り込み地図の白。表組みと地図の下地 */
+  --sumi: #231815;   /* 印刷のスミ (公式地図の実測値) */
+  --sumi2: #595757;  /* 副次テキスト (同上) */
+  --sumi3: #6f6a69;  /* 三次テキスト。紙地に対して 4.7:1、これ以上薄くしない */
+  --rule: #c9c8c8;   /* 罫 (同上) */
+  --rule2: #a2a0a0;  /* 濃い罫 (同上) */
+  --ai: #444499;     /* 準備会サイトの藍 */
+  --ai-dk: #000066;
+  --ai-lt: #6666bb;
+  --ai-pale: #dfdfff;
+  --shu: #b7282e;    /* 差し色。警告と最優先にだけ使う */
   --gothic: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic",
     YuGothic, "Noto Sans JP", Meiryo, system-ui, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -31,34 +37,31 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   overflow-x: hidden; /* 何かが溢れても横スクロールは出さない (会場で片手操作するため) */
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--paper);
+  color: var(--sumi);
   font-family: var(--gothic);
   font-size: 17px;
   line-height: 1.6;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-b.warn { color: var(--red-lt); }
+b.warn { color: var(--shu); }
 
 /* ---------- 見出し帯 ---------- */
 
 .masthead {
-  border-bottom: 4px solid var(--red);
-  background: linear-gradient(180deg, #1c1c22 0%, var(--ink2) 100%);
+  border-bottom: 3px solid var(--sumi);
+  background: var(--card);
 }
 
-.masthead__stripe {
-  height: 10px;
-  background: repeating-linear-gradient(-45deg,
-    var(--red) 0 14px, var(--ink) 14px 28px);
-}
+/* カタログの帯に相当する藍のベタ。斜線ハッチは工事現場的で公式には無い */
+.masthead__stripe { height: 9px; background: var(--ai); }
 
 .masthead__body {
   display: flex;
   align-items: flex-end;
   gap: 14px;
-  padding: 20px 16px 18px;
+  padding: 22px 16px 18px;
   max-width: 1120px;
   margin: 0 auto;
 }
@@ -73,12 +76,12 @@ b.warn { color: var(--red-lt); }
 
 .masthead h1 em {
   font-style: normal;
-  color: var(--red-lt);
+  color: var(--ai);
 }
 
 .masthead .tag {
   font-size: 14px;
-  color: var(--dim);
+  color: var(--sumi2);
   letter-spacing: 0.03em;
   margin-top: 7px;
 }
@@ -87,7 +90,7 @@ b.warn { color: var(--red-lt); }
   margin-left: auto;
   text-align: right;
   font-size: 12.5px;
-  color: var(--dim2);
+  color: var(--sumi3);
   letter-spacing: 0.06em;
   line-height: 1.45;
   min-width: 0;
@@ -130,28 +133,28 @@ h2 {
   font-size: 15px;
   font-weight: 900;
   letter-spacing: 0.14em;
-  color: var(--paper);
-  border-left: 7px solid var(--red);
-  border-bottom: 1px solid var(--line);
+  color: var(--sumi);
+  border-left: 7px solid var(--ai);
+  border-bottom: 1px solid var(--rule2);
   padding: 3px 0 7px 11px;
   line-height: 1.4;
 }
 
-h2 span { color: var(--dim2); font-weight: 400; letter-spacing: 0.03em; font-size: 13px; }
+h2 span { color: var(--sumi3); font-weight: 400; letter-spacing: 0.03em; font-size: 13px; }
 
-.hint { font-size: 13.5px; color: var(--dim2); margin: 9px 2px 0; line-height: 1.65; }
-.hint b { color: var(--dim); }
+.hint { font-size: 13.5px; color: var(--sumi2); margin: 9px 2px 0; line-height: 1.65; }
+.hint b { color: var(--sumi); }
 
 /* ---------- 入力 ---------- */
 
-.panel { background: var(--ink2); border: 1px solid var(--line); }
+.panel { background: var(--card); border: 1px solid var(--rule2); }
 
 textarea {
   width: 100%;
   min-height: 190px;
-  background: var(--ink3);
-  color: var(--paper);
-  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--sumi);
+  border: 1px solid var(--rule2);
   border-radius: 0;
   padding: 12px;
   font-size: 16px;
@@ -161,7 +164,7 @@ textarea {
 }
 
 textarea:focus, input:focus, select:focus {
-  outline: 3px solid var(--red);
+  outline: 3px solid var(--ai);
   outline-offset: -3px;
 }
 
@@ -175,7 +178,7 @@ textarea:focus, input:focus, select:focus {
 label.f {
   display: block;
   font-size: 12.5px;
-  color: var(--dim);
+  color: var(--sumi2);
   letter-spacing: 0.08em;
   font-weight: 700;
 }
@@ -183,9 +186,9 @@ label.f {
 input, select {
   width: 100%;
   margin-top: 5px;
-  background: var(--ink3);
-  color: var(--paper);
-  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--sumi);
+  border: 1px solid var(--rule2);
   border-radius: 0;
   padding: 11px 9px;
   font-size: 16px;
@@ -198,10 +201,10 @@ input, select {
   gap: 10px;
   margin-top: 16px;
   font-size: 15px;
-  color: var(--dim);
+  color: var(--sumi2);
 }
 
-.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--red); }
+.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--ai); }
 
 button {
   font-family: var(--gothic);
@@ -216,17 +219,17 @@ button {
   width: 100%;
   margin-top: 18px;
   padding: 18px;
-  background: var(--red);
+  background: var(--ai);
   color: #fff;
   font-size: 18px;
 }
 
-.btn-go:active { background: var(--red-dk); }
+.btn-go:active { background: var(--ai-dk); }
 
 .btn-sub {
-  background: var(--ink3);
-  color: var(--dim);
-  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--sumi);
+  border: 1px solid var(--rule2);
   padding: 11px 15px;
   font-size: 14px;
   font-weight: 700;
@@ -239,8 +242,8 @@ button {
 
 .samples button {
   background: transparent;
-  border: 1px solid var(--line2);
-  color: var(--dim);
+  border: 1px solid var(--rule2);
+  color: var(--sumi2);
   font-size: 13px;
   font-weight: 400;
   letter-spacing: 0;
@@ -252,24 +255,24 @@ button {
 .summary {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border: 1px solid var(--line);
-  background: var(--ink2);
+  border: 1px solid var(--rule2);
+  background: var(--card);
 }
 
-.summary div { padding: 13px 4px 12px; text-align: center; border-left: 1px solid var(--line); }
+.summary div { padding: 13px 4px 12px; text-align: center; border-left: 1px solid var(--rule); }
 .summary div:first-child { border-left: 0; }
 .summary b { display: block; font-size: 30px; font-weight: 900; line-height: 1.05; }
-.summary small { display: block; margin-top: 4px; font-size: 12px; color: var(--dim2); letter-spacing: 0.06em; }
-.summary .accent b { color: var(--red-lt); }
+.summary small { display: block; margin-top: 4px; font-size: 12px; color: var(--sumi3); letter-spacing: 0.06em; }
+.summary .accent b { color: var(--ai); }
 
-.progress { height: 7px; background: var(--ink3); border: 1px solid var(--line); border-top: 0; }
-.progress i { display: block; height: 100%; background: var(--green); width: 0; transition: width .18s; }
+.progress { height: 7px; background: var(--paper2); border: 1px solid var(--rule2); border-top: 0; }
+.progress i { display: block; height: 100%; background: var(--ai); width: 0; transition: width .18s; }
 
 /* ---------- 地図 ---------- */
 
 .mapwrap {
-  border: 1px solid var(--line);
-  background: var(--ink);
+  border: 1px solid var(--rule2);
+  background: var(--card);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -282,7 +285,7 @@ button {
   gap: 14px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: var(--dim);
+  color: var(--sumi2);
   margin-top: 10px;
   align-items: center;
 }
@@ -298,34 +301,34 @@ button {
 
 /* 優先度の色。CSP(style-src 'self') で style="" 属性が効かないので、
    色は必ずクラスで当てる。JS 側 stopColor() と対応させること。 */
-.p12 { background: var(--red); }
-.p3 { background: var(--amber); }
-.p45 { background: var(--blue); }
-.legend i.wallmark { background: #55555f; box-shadow: inset 0 0 0 2px var(--paper); }
+.p12 { background: var(--shu); }
+.p3 { background: var(--ai); }
+.p45 { background: var(--sumi2); }
+.legend i.wallmark { background: var(--card); box-shadow: inset 0 0 0 2px var(--sumi); }
 
 /* ---------- 巡回順 ---------- */
 
 .stop {
   display: flex;
   align-items: stretch;
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule2);
   border-top: 0;
-  background: var(--ink2);
+  background: var(--card);
 }
 
-.stop:first-of-type { border-top: 1px solid var(--line); }
-.stop.done { opacity: 0.42; }
+.stop:first-of-type { border-top: 1px solid var(--rule2); }
+.stop.done { opacity: 0.45; }
 
 .stop__no {
   flex: 0 0 36px;
-  background: var(--ink3);
-  color: var(--dim);
+  background: var(--paper2);
+  color: var(--sumi2);
   font-size: 15px;
   font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--rule);
 }
 
 .stop__sym {
@@ -340,16 +343,16 @@ button {
 
 .stop__sym b { font-size: 31px; font-weight: 900; line-height: 1; letter-spacing: 0; }
 .stop__sym s { font-size: 11px; text-decoration: none; opacity: .9; letter-spacing: .04em; }
-.stop__sym.wall { box-shadow: inset 0 0 0 3px var(--paper); }
+.stop__sym.wall { box-shadow: inset 0 0 0 3px var(--card); }
 
 .stop__main { flex: 1 1 auto; min-width: 0; padding: 10px 12px; }
 
 .stop__loc { font-size: 17px; font-weight: 700; letter-spacing: 0.02em; }
-.stop__loc u { text-decoration: none; color: var(--dim); font-weight: 400; font-size: 13.5px; }
+.stop__loc u { text-decoration: none; color: var(--sumi2); font-weight: 400; font-size: 13.5px; }
 /* メモ欄にはサークル名が入る。1 行で切ると会場で肝心の名前が読めないので 2 行まで出す */
 .stop__lab {
   font-size: 14px;
-  color: var(--dim);
+  color: var(--sumi2);
   margin-top: 3px;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -363,25 +366,25 @@ button {
   flex: 0 0 84px;
   text-align: right;
   padding: 10px 10px;
-  border-left: 1px dashed var(--line2);
+  border-left: 1px dashed var(--rule2);
   white-space: nowrap;
 }
 
 .stop__time b { display: block; font-size: 20px; font-weight: 900; line-height: 1.2; }
-.stop__time small { font-size: 11.5px; color: var(--dim2); }
+.stop__time small { font-size: 11.5px; color: var(--sumi3); }
 
 .stop__chk {
   flex: 0 0 46px;
-  border-left: 1px solid var(--line);
+  border-left: 1px solid var(--rule);
   background: transparent;
-  color: #6b6b78;
+  color: var(--rule2);
   font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.stop.done .stop__chk { color: var(--green); }
+.stop.done .stop__chk { color: var(--ai); }
 
 /* 狭い画面では左右の固定カラムを詰めて、サークル名/メモの幅を確保する。
    文字サイズは落とさない (会場で読めなくなる) */
@@ -404,7 +407,7 @@ button {
   letter-spacing: 0.05em;
   padding: 1px 7px;
   margin-left: 7px;
-  color: var(--ink);
+  color: #fff;
   vertical-align: 2px;
 }
 
@@ -412,23 +415,23 @@ button {
 
 .notice {
   margin-top: 18px;
-  border: 1px solid var(--line);
-  border-left: 7px solid var(--amber);
-  background: var(--ink2);
+  border: 1px solid var(--rule2);
+  border-left: 7px solid var(--ai);
+  background: var(--card);
   padding: 13px 15px;
   font-size: 14px;
-  color: var(--dim);
+  color: var(--sumi2);
 }
 
-.notice.bad { border-left-color: var(--red); }
-.notice b { color: var(--paper); }
+.notice.bad { border-left-color: var(--shu); }
+.notice b { color: var(--sumi); }
 .notice ul { margin: 7px 0 0; padding-left: 20px; }
 
 .empty {
-  border: 1px dashed var(--line2);
+  border: 1px dashed var(--rule2);
   padding: 34px 16px;
   text-align: center;
-  color: var(--dim2);
+  color: var(--sumi2);
   font-size: 14.5px;
 }
 
@@ -436,14 +439,14 @@ button {
 
 footer {
   margin-top: 40px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--rule2);
   padding: 18px 2px 0;
   font-size: 13px;
-  color: var(--dim2);
+  color: var(--sumi2);
   line-height: 1.8;
 }
 
-footer a { color: var(--dim); }
+footer a { color: var(--ai); }
 
 .grid-full { grid-column: 1 / -1; }
 
@@ -453,12 +456,12 @@ footer a { color: var(--dim); }
   display: none;
   align-items: center;
   gap: 12px;
-  border: 1px solid var(--red);
-  background: rgba(230, 0, 18, .11);
+  border: 1px solid var(--ai);
+  background: var(--ai-pale);
   padding: 13px 15px;
   font-size: 14px;
   margin-top: 18px;
 }
 
 .install.on { display: flex; }
-.install button { margin-left: auto; background: var(--red); color: #fff; padding: 10px 16px; font-size: 14px; }
+.install button { margin-left: auto; background: var(--ai); color: #fff; padding: 10px 16px; font-size: 14px; }

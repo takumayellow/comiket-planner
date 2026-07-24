@@ -194,7 +194,8 @@ function notice(kind, title, items) {
 function asText() {
   const plan = state.plan;
   if (!plan) return '';
-  const head = `巡回順（${plan.stops.length}件 / 約${Math.round(plan.totalMin)}分）`;
+  // 画面の「所要(分)」と同じ丸めにする (Math.round だと1分ずれることがある)
+  const head = `巡回順（${plan.stops.length}件 / 約${pyRound(plan.totalMin)}分）`;
   const body = plan.stops.map((s, i) => {
     const p = s.placement;
     const items = state.groups.get(p.groupKey) || [p];

@@ -1,7 +1,9 @@
 // 会場(東京ビッグサイト)は電波が非常に悪い。一度開いたら通信なしで完全に動くよう、
 // アプリシェルを丸ごと先読みキャッシュする。計算はもともと端末内で完結する。
 
-const VERSION = 'cp-2026-07-24-2';
+// VERSION は手で書かない。scripts/stamp_sw_version.py が ASSETS 実体のハッシュから
+// 打ち直す (手動運用だと JS だけ直したときに install が発火せず古い版が residue する)。
+const VERSION = 'cp-5146e86e71e9';
 // './index.html' は入れない。Vercel の cleanUrls が /index.html → / に 308 する結果
 // リダイレクト済みレスポンスになり、Cache.put が TypeError を投げて install ごと失敗する
 // (= オフラインが一切効かなくなる)。シェルは './' だけを持つ。

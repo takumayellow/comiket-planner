@@ -1,0 +1,27 @@
+# 個人データ・音声・個人的な巡回結果は一切コミットしない
+.local/
+
+# 公式配布物（折込地図PDF 等）は再配布しない。scripts/fetch_official.sh で各自取得する
+data/official/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

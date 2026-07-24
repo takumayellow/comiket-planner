@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コミケ巡回プランナー</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #0f1115; color: #e7ecf3; }
+  header { padding: 16px 20px; border-bottom: 1px solid #232838; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; color: #8b97ad; font-size: 12px; }
+  main { display: grid; grid-template-columns: 360px 1fr; gap: 0; height: calc(100vh - 66px); }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; height: auto; } }
+  .panel { padding: 16px 20px; overflow: auto; }
+  .panel.left { border-right: 1px solid #232838; }
+  textarea { width: 100%; height: 200px; background: #171b26; color: #e7ecf3;
+    border: 1px solid #2c3346; border-radius: 8px; padding: 10px; font-size: 13px;
+    font-family: ui-monospace, monospace; resize: vertical; }
+  label { display: block; font-size: 12px; color: #8b97ad; margin: 12px 0 4px; }
+  input, select { background: #171b26; color: #e7ecf3; border: 1px solid #2c3346;
+    border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+  .row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+  button { background: #3b82f6; color: #fff; border: 0; border-radius: 8px;
+    padding: 10px 16px; font-size: 14px; cursor: pointer; margin-top: 14px; }
+  button.secondary { background: #2c3346; }
+  button:disabled { opacity: .5; cursor: default; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #1e2430; }
+  th { color: #8b97ad; font-weight: 500; }
+  .warn { color: #f2c94c; }
+  .muted { color: #8b97ad; font-size: 12px; }
+  .svgwrap { background: #0f1115; border: 1px solid #232838; border-radius: 8px;
+    padding: 8px; overflow: auto; }
+  .svgwrap svg { width: 100%; height: auto; }
+  .pill { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11px; }
+  .summary { font-size: 14px; margin: 8px 0; }
+  a { color: #6ea8fe; }
+</style>
+</head>
+<body>
+<header>
+  <h1>コミケ巡回プランナー</h1>
+  <p>行きたいサークルの「ブロック記号＋番号」を入れると、完売リスクと優先度を考えて回る順を計算します。サークルの実データは持ちません（自分のリストを入れてください）。</p>
+</header>
+<main>
+  <section class="panel left">
+    <label>行きたいリスト（1行ずつ / <code>*1</code>〜<code>*5</code> で優先度、右にメモ）</label>
+    <textarea id="text">東H07 *2 ホロライブ
+東E18 *2 ぺこら
+東D24-37 *2 フブキ
+西あ36 *2 ごちうさ
+西せ9-15 *3 おにまい
+南q06,10,16 *3</textarea>
+
+    <div class="row">
+      <div>
+        <label>入場時刻</label>
+        <input id="start" type="time" value="10:30">
+      </div>
+      <div>
+        <label>最初のホール（チケット依存）</label>
+        <select id="zone">
+          <option value="">自動（人気集中から）</option>
+          <option value="east123">東1・2・3</option>
+          <option value="east7">東7</option>
+          <option value="west12">西1・2</option>
+          <option value="south12">南1・2</option>
+        </select>
+      </div>
+      <div>
+        <label>使える時間(分, 任意)</label>
+        <input id="budget" type="number" min="30" step="15" placeholder="無制限" style="width:90px">
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="go">巡回順を計算</button>
+      <button id="mic" class="secondary" type="button">🎤 音声で入力</button>
+    </div>
+    <p class="muted" id="micnote"></p>
+    <p class="muted">凡例: <span class="pill" style="background:#e5484d">優先1-2</span>
+      <span class="pill" style="background:#f2c94c;color:#111">3</span>
+      <span class="pill" style="background:#5aa9e6;color:#111">4-5</span></p>
+  </section>
+
+  <section class="panel">
+    <div id="summary" class="summary muted">左でリストを入れて「計算」を押してください。</div>
+    <div id="svgwrap" class="svgwrap"></div>
+    <div id="result"></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+
+async function plan() {
+  const body = {
+    text: $('#text').value,
+    start: $('#start').value || '10:30',
+    start_zone: $('#zone').value || null,
+    budget: $('#budget').value ? parseInt($('#budget').value) : null,
+  };
+  $('#go').disabled = true;
+  try {
+    const r = await fetch('/api/plan', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const data = await r.json();
+    render(data);
+  } catch (e) {
+    $('#summary').textContent = 'エラー: ' + e;
+  } finally { $('#go').disabled = false; }
+}
+
+function render(data) {
+  const p = data.plan;
+  $('#summary').innerHTML = `入場 <b>${p.start}</b> / 開始ゾーン <b>${p.start_zone}</b>
+    / 所要 約<b>${p.total_minutes}</b>分 / <b>${p.n_visited}</b>ブロック`
+    + (p.n_dropped ? ` / 時間で外した ${p.n_dropped}` : '');
+  $('#svgwrap').innerHTML = data.svg;
+  let rows = p.stops.map(s => `<tr>
+    <td>${s.order}</td><td>${s.arrival}</td>
+    <td>${s.district}${s.block}${String(s.number).padStart(2,'0')}${s.ab||''}
+      ${s.confidence!=='ok'?'<span class="warn">⚠</span>':''}</td>
+    <td>${s.hall||''}</td><td>${s.label||''}</td>
+    <td>${s.priority}</td><td>+${s.walk_min}分</td></tr>`).join('');
+  let html = `<table><thead><tr><th>#</th><th>着</th><th>場所</th><th>ホール</th>
+    <th>作品/サークル</th><th>優先</th><th>移動</th></tr></thead><tbody>${rows}</tbody></table>`;
+  if (p.dropped && p.dropped.length)
+    html += `<p class="muted">時間で外した候補: ${p.dropped.join(' / ')}</p>`;
+  if (p.unlocatable && p.unlocatable.length)
+    html += `<p class="warn">場所を特定できなかった入力: ${p.unlocatable.join(' / ')}</p>`;
+  $('#result').innerHTML = html;
+}
+
+$('#go').addEventListener('click', plan);
+
+// 音声入力（サーバに GROQ_API_KEY があるときだけ動く）
+let rec, chunks = [];
+$('#mic').addEventListener('click', async () => {
+  if (rec && rec.state === 'recording') { rec.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    rec = new MediaRecorder(stream); chunks = [];
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = async () => {
+      $('#micnote').textContent = '文字起こし中…';
+      const fd = new FormData();
+      fd.append('file', new Blob(chunks, {type:'audio/webm'}), 'memo.webm');
+      const r = await fetch('/api/transcribe', {method:'POST', body: fd});
+      const d = await r.json();
+      if (d.error) { $('#micnote').textContent = d.error; return; }
+      $('#text').value += (($('#text').value?'\n':'') + d.text);
+      $('#micnote').textContent = '取り込みました。番号を整えて計算してください。';
+      $('#mic').textContent = '🎤 音声で入力';
+    };
+    rec.start();
+    $('#mic').textContent = '⏹ 停止して文字起こし';
+    $('#micnote').textContent = '録音中…もう一度押すと停止します。';
+  } catch (e) { $('#micnote').textContent = 'マイクを使えません: ' + e; }
+});
+
+plan();
+</script>
+</body>
+</html>

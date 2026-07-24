@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comiket-planner"
+version = "0.1.0"
+description = "行きたいサークルのリストから、完売リスクと優先度を考えた最適な巡回順を導くツール"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+web = ["fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.9", "pydantic>=2"]
+asr = ["openai>=1.30", "python-dotenv>=1.0"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+comiket-plan = "comiket_planner.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+comiket_planner = ["static/*", "data/*.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

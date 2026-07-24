@@ -1,3 +1,7 @@
 package.json
 README.md
 _dbg.html
+
+# 資格情報。CLI の既定でも除外されるが明示しておく
+.env*
+.vercel

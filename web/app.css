@@ -1,30 +1,33 @@
-/* 配色はコミケ公式の一次ソースから採った (色を「それっぽく」創作しない):
-     - C108 折り込み地図 (comiket.co.jp/info-a/C108/images/C108CtlgMapAll.png) は
-       彩度のある画素が 0.00%。白い紙 + 印刷のスミ #231815 + グレー #595757/#918b8a/
-       #a2a0a0/#c9c8c8 だけで刷られている。カタログ本体も同じ「紙に黒一色」。
-     - 準備会公式サイト (comiket.co.jp/top/style.css) の唯一の色みが藍紫
-       #444499 / #5555aa / #6666bb / #000066 / #dfdfff。これがコミケのブランド色。
-   よって「紙＋スミ＋藍」が基調。朱 (--shu) は警告と最優先だけの差し色に留める。
-
+/* 配色はコミケ公式のカタログ表紙から採った (色を「それっぽく」創作しない)。
+   夏コミの表紙は毎回「晴れた空と水色」で、ビッグサイトのガラス面と雲がモチーフ。
+   ここではその「澄んだ水色」を主役に置き、紙のスミではなく空の階調で組み立てる。
+     - 空の水色 --sky-0〜3 … 背景・帯・面
+     - 主色 --aqua        … 見出し・ボタン・優先3
+     - 桜色 --rose        … 差し色。最優先(優先1・2)と警告にだけ使う
    会場は屋外・炎天下で片手で見るので:
    - 本文 17px を基準にする (小さい字は会場でまず読めない)
    - 入力欄は 16px 以上。iOS はこれ未満だとフォーカス時に勝手にズームする
-   - 紙地なので直射日光下でも沈まない */
+   - 文字色は必ず 4.5:1 以上。薄い水色の上に薄い字を置かない */
 
 :root {
-  --paper: #f4f1ea;  /* カタログ本文の再生紙 */
-  --paper2: #eae6dc; /* 一段沈めた紙 (入力欄の下地・帯) */
-  --card: #ffffff;   /* 折り込み地図の白。表組みと地図の下地 */
-  --sumi: #231815;   /* 印刷のスミ (公式地図の実測値) */
-  --sumi2: #595757;  /* 副次テキスト (同上) */
-  --sumi3: #6f6a69;  /* 三次テキスト。紙地に対して 4.7:1、これ以上薄くしない */
-  --rule: #c9c8c8;   /* 罫 (同上) */
-  --rule2: #a2a0a0;  /* 濃い罫 (同上) */
-  --ai: #444499;     /* 準備会サイトの藍 */
-  --ai-dk: #000066;
-  --ai-lt: #6666bb;
-  --ai-pale: #dfdfff;
-  --shu: #b7282e;    /* 差し色。警告と最優先にだけ使う */
+  --sky-0: #f7fcff;  /* ページの地。ほぼ白い空 */
+  --sky-1: #eaf6fd;
+  --sky-2: #d6ecfa;
+  --sky-3: #a9daf3;
+  --aqua: #2e9fd8;   /* 主色 */
+  --aqua-d: #1a76a8; /* 主色の文字用 (白地に 4.9:1) */
+  --aqua-x: #0f4f74; /* 見出し */
+  --ink: #16344a;    /* 本文 */
+  --ink2: #42627a;   /* 副次テキスト (白地に 6.6:1) */
+  --ink3: #5c7c93;   /* 三次テキスト (白地に 4.6:1)。これ以上薄くしない */
+  --line: #dceefa;   /* 罫 */
+  --line2: #b7d9ec;  /* 濃い罫 */
+  --card: #ffffff;
+  --rose: #d6385c;   /* 差し色。最優先と警告にだけ使う */
+  --rose-d: #b32748;
+  --rose-1: #fdeef2;
+  --shadow: 0 10px 30px -18px rgba(15, 79, 116, .55);
+  --r: 14px;         /* 角丸の基準 */
   --gothic: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic",
     YuGothic, "Noto Sans JP", Meiryo, system-ui, sans-serif;
   color-scheme: light;
@@ -37,73 +40,162 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   overflow-x: hidden; /* 何かが溢れても横スクロールは出さない (会場で片手操作するため) */
-  background: var(--paper);
-  color: var(--sumi);
+  background:
+    radial-gradient(1200px 420px at 12% -60px, #ffffff 0%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, var(--sky-1) 0%, var(--sky-0) 340px, var(--sky-0) 100%);
+  background-attachment: fixed;
+  color: var(--ink);
   font-family: var(--gothic);
   font-size: 17px;
   line-height: 1.6;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-b.warn { color: var(--shu); }
+b.warn { color: var(--rose-d); }
 
-/* ---------- 見出し帯 ---------- */
+.br-sp { display: none; }
+@media (min-width: 720px) { .br-sp { display: inline; } }
 
-.masthead {
-  border-bottom: 3px solid var(--sumi);
-  background: var(--card);
+/* ---------- ヒーロー ---------- */
+/* カタログ表紙の「空」をそのまま面で作る。写真は使わない (再配布不可・重い)。
+   雲 = ぼかした白の楕円、ガラス面 = 斜めの帯。どちらも CSS だけで描く。 */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  padding: 0 0 6px;
+  overflow: hidden;
 }
 
-/* カタログの帯に相当する藍のベタ。斜線ハッチは工事現場的で公式には無い */
-.masthead__stripe { height: 9px; background: var(--ai); }
+.hero__sky {
+  position: absolute;
+  inset: -40% 0 0;
+  z-index: -2;
+  background: linear-gradient(178deg, #6cc0ea 0%, #98d6f2 34%, #cfeafb 66%, var(--sky-0) 100%);
+}
 
-.masthead__body {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  padding: 22px 16px 18px;
+.hero__sky .cloud {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, .95), rgba(255, 255, 255, 0));
+  filter: blur(2px);
+}
+
+.cloud--a { width: 52vw; height: 22vw; left: -8vw; top: 44%; }
+.cloud--b { width: 38vw; height: 15vw; right: -6vw; top: 36%; opacity: .85; }
+.cloud--c { width: 30vw; height: 12vw; left: 46%; top: 62%; opacity: .7; }
+
+/* ビッグサイトのガラス面。斜めの帯を薄く重ねるだけ */
+.hero__sky .glass {
+  position: absolute;
+  inset: 0;
+  opacity: .3;
+  background:
+    repeating-linear-gradient(64deg, rgba(255, 255, 255, .5) 0 2px,
+      rgba(255, 255, 255, 0) 2px 46px),
+    repeating-linear-gradient(-64deg, rgba(255, 255, 255, .32) 0 2px,
+      rgba(255, 255, 255, 0) 2px 46px);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, 0) 78%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, 0) 78%);
+}
+
+/* 空と本文の境目。まっすぐ切らずに弧で受ける */
+.hero__arc {
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  bottom: -46px;
+  height: 92px;
+  z-index: -1;
+  border-radius: 50% 50% 0 0;
+  background: var(--sky-0);
+}
+
+.hero__inner {
   max-width: 1120px;
   margin: 0 auto;
+  padding: 38px 20px 56px;
 }
 
-.masthead h1 {
+.hero__eyebrow {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: var(--aqua-x);
+}
+
+.hero h1 {
   margin: 0;
-  font-size: clamp(28px, 7.4vw, 40px);
+  font-size: clamp(31px, 7.6vw, 54px);
   font-weight: 900;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
-}
-
-.masthead h1 em {
-  font-style: normal;
-  color: var(--ai);
-}
-
-.masthead .tag {
-  font-size: 14px;
-  color: var(--sumi2);
   letter-spacing: 0.03em;
-  margin-top: 7px;
+  line-height: 1.12;
+  color: #0d3f5f;
+  text-shadow: 0 2px 18px rgba(255, 255, 255, .65);
 }
 
-.masthead__meta {
-  margin-left: auto;
-  text-align: right;
-  font-size: 12.5px;
-  color: var(--sumi3);
-  letter-spacing: 0.06em;
-  line-height: 1.45;
-  min-width: 0;
+/* 「巡回」だけ白い札に抜く。空の上に白文字を直接置くとコントラストが足りない
+   (実機で読めなかった)。文字は濃紺のまま、下地の方を白くする。 */
+.hero h1 em {
+  position: relative;
+  z-index: 0;               /* ::before を自分の中だけで背面に置くため */
+  display: inline-block;
+  padding: 0 .14em;
+  font-style: normal;
+  color: var(--aqua-x);
+  text-shadow: none;
 }
 
-/* 狭い画面では会場名を下に落とす。横に並べるとタイトルが語中で折れる */
-@media (max-width: 560px) {
-  .masthead__body { flex-wrap: wrap; gap: 0; }
-  .masthead__meta {
-    margin: 9px 0 0;
-    width: 100%;
-    text-align: left;
-  }
+.hero h1 em::before {
+  content: "";
+  position: absolute;
+  inset: .1em -.02em .06em;
+  z-index: -1;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .88);
+  box-shadow: 0 10px 24px -16px rgba(13, 63, 95, .9);
+}
+
+.hero__lead {
+  margin: 16px 0 0;
+  max-width: 40em;
+  font-size: 15.5px;
+  line-height: 1.85;
+  color: #0f4a6c;
+}
+
+.hero__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 26px 0 0;
+}
+
+.hero__facts div {
+  flex: 0 1 auto;
+  padding: 9px 16px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9), 0 6px 18px -12px rgba(15, 79, 116, .8);
+  backdrop-filter: blur(6px);
+}
+
+.hero__facts dt {
+  display: inline;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--aqua-d);
+}
+
+.hero__facts dd {
+  display: inline;
+  margin: 0 0 0 9px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--aqua-x);
 }
 
 /* ---------- レイアウト ---------- */
@@ -111,160 +203,211 @@ b.warn { color: var(--shu); }
 main {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0 14px 96px;
+  padding: 8px 14px 60px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 940px) {
   main {
     display: grid;
-    grid-template-columns: 404px 1fr;
-    gap: 26px;
+    grid-template-columns: 424px 1fr;
+    gap: 24px;
     align-items: start;
-    padding-bottom: 40px;
+    padding-bottom: 56px;
   }
-  .col-in { position: sticky; top: 14px; }
   .col-out { min-width: 0; }
 }
 
-section { margin-top: 26px; }
+section { margin-top: 20px; }
+.col-in > section:first-child, .col-out > section:first-child { margin-top: 0; }
 
-h2 {
-  margin: 0 0 12px;
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  color: var(--sumi);
-  border-left: 7px solid var(--ai);
-  border-bottom: 1px solid var(--rule2);
-  padding: 3px 0 7px 11px;
-  line-height: 1.4;
+.card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 20px 20px 22px;
 }
 
-h2 span { color: var(--sumi3); font-weight: 400; letter-spacing: 0.03em; font-size: 13px; }
+@media (max-width: 480px) { .card { padding: 17px 14px 18px; } }
 
-.hint { font-size: 13.5px; color: var(--sumi2); margin: 9px 2px 0; line-height: 1.65; }
-.hint b { color: var(--sumi); }
+h2 {
+  margin: 0 0 16px;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--aqua-x);
+  line-height: 1.35;
+}
+
+/* 節の頭の英字ラベル。日本語見出しの上に小さく置いて情報の階層を作る */
+.eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  color: var(--aqua);
+}
+
+.eyebrow::after {
+  content: '';
+  display: inline-block;
+  width: 26px;
+  height: 2px;
+  margin: 0 0 4px 9px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--aqua), rgba(46, 159, 216, 0));
+  vertical-align: middle;
+}
+
+h2 .sub {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--ink3);
+}
+
+.hint { font-size: 13.5px; color: var(--ink2); margin: 12px 2px 0; line-height: 1.8; }
+.hint b { color: var(--ink); }
 
 /* ---------- 入力 ---------- */
 
-.panel { background: var(--card); border: 1px solid var(--rule2); }
-
 textarea {
   width: 100%;
-  min-height: 190px;
-  background: var(--card);
-  color: var(--sumi);
-  border: 1px solid var(--rule2);
-  border-radius: 0;
-  padding: 12px;
+  min-height: 178px;
+  background: linear-gradient(180deg, #fbfeff, #fff 34px);
+  color: var(--ink);
+  border: 1.5px solid var(--line2);
+  border-radius: 12px;
+  padding: 13px 14px;
   font-size: 16px;
   font-family: var(--gothic);
-  line-height: 1.8;
+  line-height: 1.85;
   resize: vertical;
+  transition: border-color .15s, box-shadow .15s;
 }
 
+textarea::placeholder { color: #8fabbe; }
+
 textarea:focus, input:focus, select:focus {
-  outline: 3px solid var(--ai);
-  outline-offset: -3px;
+  outline: 0;
+  border-color: var(--aqua);
+  box-shadow: 0 0 0 4px rgba(46, 159, 216, .18);
 }
 
 .fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
+  gap: 14px;
 }
 
 label.f {
   display: block;
-  font-size: 12.5px;
-  color: var(--sumi2);
-  letter-spacing: 0.08em;
-  font-weight: 700;
+  font-size: 12px;
+  color: var(--ink2);
+  letter-spacing: 0.1em;
+  font-weight: 800;
 }
 
 input, select {
   width: 100%;
-  margin-top: 5px;
+  margin-top: 6px;
   background: var(--card);
-  color: var(--sumi);
-  border: 1px solid var(--rule2);
-  border-radius: 0;
-  padding: 11px 9px;
+  color: var(--ink);
+  border: 1.5px solid var(--line2);
+  border-radius: 10px;
+  padding: 11px 10px;
   font-size: 16px;
   font-family: var(--gothic);
+  transition: border-color .15s, box-shadow .15s;
 }
 
 .check {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   margin-top: 16px;
   font-size: 15px;
-  color: var(--sumi2);
+  color: var(--ink2);
 }
 
-.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--ai); }
+.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--aqua); }
 
 button {
   font-family: var(--gothic);
-  font-weight: 900;
-  letter-spacing: 0.1em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   border: 0;
-  border-radius: 0;
+  border-radius: 10px;
   cursor: pointer;
+  transition: transform .12s, box-shadow .15s, background .15s, color .15s;
 }
 
 .btn-go {
   width: 100%;
   margin-top: 18px;
-  padding: 18px;
-  background: var(--ai);
+  padding: 17px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #38aee2 0%, var(--aqua) 46%, var(--aqua-d) 100%);
   color: #fff;
   font-size: 18px;
+  letter-spacing: 0.12em;
+  box-shadow: 0 14px 28px -14px rgba(26, 118, 168, .95);
 }
 
-.btn-go:active { background: var(--ai-dk); }
+.btn-go:hover { transform: translateY(-1px); box-shadow: 0 18px 34px -14px rgba(26, 118, 168, .95); }
+.btn-go:active { transform: translateY(1px); box-shadow: 0 8px 18px -12px rgba(26, 118, 168, .95); }
 
 .btn-sub {
   background: var(--card);
-  color: var(--sumi);
-  border: 1px solid var(--rule2);
-  padding: 11px 15px;
+  color: var(--aqua-x);
+  border: 1.5px solid var(--line2);
+  padding: 10px 16px;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.05em;
+  border-radius: 999px;
 }
 
-.btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.btn-sub:hover { border-color: var(--aqua); background: var(--sky-1); }
+
+.btn-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
 
 .samples { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
 .samples button {
-  background: transparent;
-  border: 1px solid var(--rule2);
-  color: var(--sumi2);
+  background: var(--sky-1);
+  color: var(--ink2);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0;
-  padding: 6px 11px;
+  padding: 7px 14px;
+  border-radius: 999px;
 }
+
+.samples button:hover { background: var(--sky-2); color: var(--aqua-x); }
 
 /* ---------- 音声入力 ---------- */
 
-.mic { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.mic { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 
 .btn-mic {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   background: var(--card);
-  color: var(--ai-dk);
-  border: 2px solid var(--ai);
-  padding: 12px 18px;
+  color: var(--aqua-d);
+  border: 2px solid var(--aqua);
+  padding: 11px 20px;
   font-size: 15px;
   letter-spacing: 0.06em;
+  border-radius: 999px;
 }
+
+.btn-mic:hover { background: var(--sky-1); }
 
 /* マイクの絵。アイコン画像を足さずに CSS だけで作る (先読みするファイルを増やさない)。
    i 本体=マイク、::before=受け皿の弧、::after=支柱と台座。色は currentColor に
@@ -301,35 +444,74 @@ button {
   background: linear-gradient(currentColor, currentColor) center top / 2px 100% no-repeat;
 }
 
-.btn-mic.on { background: var(--shu); border-color: var(--shu); color: #fff; }
+.btn-mic.on {
+  background: var(--rose);
+  border-color: var(--rose);
+  color: #fff;
+  animation: mic-pulse 1.6s ease-out infinite;
+}
 
-.mic__live { font-size: 13.5px; color: var(--sumi2); flex: 1 1 180px; min-width: 0; }
+@keyframes mic-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(214, 56, 92, .5); }
+  70% { box-shadow: 0 0 0 12px rgba(214, 56, 92, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(214, 56, 92, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-mic.on { animation: none; }
+  * { transition: none !important; }
+}
+
+.mic__live { font-size: 13.5px; color: var(--ink2); flex: 1 1 170px; min-width: 0; }
+.mic__live.bad { color: var(--rose-d); font-weight: 700; }
+
+/* 押す前に読まれる必要がある注意書きなので、フッタではなくボタンの隣に置く */
+.mic__note {
+  flex: 1 1 100%;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink3);
+  border-left: 3px solid var(--line2);
+  padding-left: 10px;
+}
+
+.mic__note b { color: var(--ink2); }
+.mic__note.local { border-left-color: var(--aqua); }
 
 /* ---------- 読み取り結果 ---------- */
-/* 優先度は推定なので、根拠と結果を並べて出して、その場で直せるようにする */
+/* 優先度は推定なので、根拠と結果を並べて出して、その場で直せるようにする。
+   サークル名は文面から拾えないことが多いので、ここで書き足せるようにしてある。 */
 
-.read { margin-top: 14px; border: 1px solid var(--rule2); background: var(--card); }
+.read {
+  margin-top: 16px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+}
 
 .read__head {
   display: flex;
   align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--rule);
-  background: var(--paper2);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--sky-1), #f4fbff);
 }
 
-.read__head b { font-size: 13.5px; letter-spacing: 0.08em; }
-.read__head span { font-size: 12px; color: var(--sumi3); }
+.read__head b { font-size: 13.5px; letter-spacing: 0.08em; color: var(--aqua-x); }
+.read__head span { font-size: 12px; color: var(--ink3); }
 
+/* 1行目に「場所 … 優先度」、2行目にサークル名の入力欄を全幅で置く。名前は
+   ここで一番よく触る欄なので、場所や優先度に幅を譲らせる。 */
 .rd {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 4px 10px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--rule);
+  gap: 7px 11px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
 }
 
 .rd:last-child { border-bottom: 0; }
@@ -341,54 +523,113 @@ button {
   white-space: nowrap;
 }
 
-.rd__loc.p12 { color: var(--shu); }
-.rd__loc.p3 { color: var(--ai); }
-.rd__loc.p45 { color: var(--sumi2); }
+.rd__loc.p12 { color: var(--rose); }
+.rd__loc.p3 { color: var(--aqua-d); }
+.rd__loc.p45 { color: var(--ink2); }
+
+/* サークル名。空欄のままでも成立するので、枠の当たりは弱くしておく */
+.rd__name {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.rd__name:focus { background: #fff; }
+.rd__name::placeholder { color: #90adc0; }
+
+.rd__cue { grid-row: 3; grid-column: 1 / -1; font-size: 11.5px; color: var(--ink3); }
+
+.rd__sel {
+  grid-row: 1;
+  grid-column: 3;
+  width: auto;
+  margin: 0;
+  padding: 8px 7px;
+  font-size: 14px;
+  border-radius: 999px;
+}
 
 .rd__lab {
+  grid-column: 2;
   font-size: 14px;
-  color: var(--sumi2);
+  color: var(--ink2);
   overflow: hidden;
   overflow-wrap: anywhere;
 }
 
-.rd__cue { grid-column: 2; font-size: 12px; color: var(--sumi3); }
-
-.rd__sel {
-  grid-row: 1 / span 2;
-  grid-column: 3;
-  width: auto;
-  margin: 0;
-  padding: 7px 6px;
-  font-size: 14px;
-}
-
-.rd.bad { background: #fbf3f3; }
-.rd.bad .rd__loc { color: var(--shu); }
-.rd.bad .rd__cue { color: var(--shu); grid-column: 2 / span 2; }
+.rd.bad { background: var(--rose-1); }
+.rd.bad .rd__loc { color: var(--rose); }
+/* 読めなかった行には名前の欄が無いので、2行目を空けずに詰める */
+.rd.bad .rd__cue { grid-row: 2; grid-column: 1 / -1; color: var(--rose-d); }
 
 /* ---------- サマリー ---------- */
 
 .summary {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border: 1px solid var(--rule2);
-  background: var(--card);
+  gap: 10px;
 }
 
-.summary div { padding: 13px 4px 12px; text-align: center; border-left: 1px solid var(--rule); }
-.summary div:first-child { border-left: 0; }
-.summary b { display: block; font-size: 30px; font-weight: 900; line-height: 1.05; }
-.summary small { display: block; margin-top: 4px; font-size: 12px; color: var(--sumi3); letter-spacing: 0.06em; }
-.summary .accent b { color: var(--ai); }
+.summary div {
+  padding: 15px 4px 13px;
+  text-align: center;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--sky-1), #fff);
+  border: 1px solid var(--line);
+}
 
-.progress { height: 7px; background: var(--paper2); border: 1px solid var(--rule2); border-top: 0; }
-.progress i { display: block; height: 100%; background: var(--ai); width: 0; transition: width .18s; }
+.summary b {
+  display: block;
+  font-size: 31px;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--aqua-x);
+}
+
+.summary small { display: block; margin-top: 5px; font-size: 11.5px; color: var(--ink3); letter-spacing: 0.08em; }
+
+.summary .accent {
+  background: linear-gradient(150deg, var(--aqua) 0%, var(--aqua-d) 100%);
+  border-color: transparent;
+}
+
+.summary .accent b { color: #fff; }
+.summary .accent small { color: rgba(255, 255, 255, .85); }
+
+@media (max-width: 520px) {
+  .summary { grid-template-columns: repeat(2, 1fr); }
+  .summary b { font-size: 27px; }
+}
+
+.progress {
+  height: 8px;
+  margin-top: 12px;
+  border-radius: 999px;
+  background: var(--sky-2);
+  overflow: hidden;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--aqua), #6fd0f0);
+  transition: width .25s ease-out;
+}
 
 /* ---------- 地図 ---------- */
 
 .mapwrap {
-  border: 1px solid var(--rule2);
+  border: 1px solid var(--line2);
+  border-radius: 12px;
   background: var(--card);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
@@ -402,8 +643,8 @@ button {
   gap: 14px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: var(--sumi2);
-  margin-top: 10px;
+  color: var(--ink2);
+  margin-top: 12px;
   align-items: center;
 }
 
@@ -420,34 +661,38 @@ button {
    色は必ずクラスで当てる。JS 側 stopColor() と対応させること。
    塗りが欲しいのは凡例の丸と巡回順の記号だけ。無条件に .p12 へ background を
    当てると、同じクラスを文字色に使う .rd__loc が地と同色に潰れる。 */
-.legend i.p12, .stop__sym.p12 { background: var(--shu); }
-.legend i.p3, .stop__sym.p3 { background: var(--ai); }
-.legend i.p45, .stop__sym.p45 { background: var(--sumi2); }
-.legend i.wallmark { background: var(--card); box-shadow: inset 0 0 0 2px var(--sumi); }
+.legend i.p12, .stop__sym.p12 { background: linear-gradient(160deg, #e6546f, var(--rose)); }
+.legend i.p3, .stop__sym.p3 { background: linear-gradient(160deg, #45aee0, var(--aqua-d)); }
+.legend i.p45, .stop__sym.p45 { background: linear-gradient(160deg, #7695a9, var(--ink2)); }
+.legend i.wallmark { background: var(--card); box-shadow: inset 0 0 0 2px var(--aqua-x); }
 
 /* ---------- 巡回順 ---------- */
 
 .stop {
   display: flex;
   align-items: stretch;
-  border: 1px solid var(--rule2);
-  border-top: 0;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
   background: var(--card);
+  overflow: hidden;
+  margin-top: 9px;
+  cursor: pointer;
+  transition: box-shadow .15s, transform .12s, opacity .15s;
 }
 
-.stop:first-of-type { border-top: 1px solid var(--rule2); }
-.stop.done { opacity: 0.45; }
+.stop:first-of-type { margin-top: 0; }
+.stop:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.stop.done { opacity: 0.44; }
 
 .stop__no {
-  flex: 0 0 36px;
-  background: var(--paper2);
-  color: var(--sumi2);
+  flex: 0 0 34px;
+  background: var(--sky-1);
+  color: var(--aqua-d);
   font-size: 15px;
   font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-right: 1px solid var(--rule);
 }
 
 .stop__sym {
@@ -457,22 +702,24 @@ button {
   align-items: center;
   justify-content: center;
   color: #fff;
-  padding: 9px 2px;
+  padding: 10px 2px;
 }
 
 .stop__sym b { font-size: 31px; font-weight: 900; line-height: 1; letter-spacing: 0; }
 .stop__sym s { font-size: 11px; text-decoration: none; opacity: .9; letter-spacing: .04em; }
-.stop__sym.wall { box-shadow: inset 0 0 0 3px var(--card); }
+.stop__sym.wall { box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .85); }
 
-.stop__main { flex: 1 1 auto; min-width: 0; padding: 10px 12px; }
+.stop__main { flex: 1 1 auto; min-width: 0; padding: 11px 13px; }
 
-.stop__loc { font-size: 17px; font-weight: 700; letter-spacing: 0.02em; }
-.stop__loc u { text-decoration: none; color: var(--sumi2); font-weight: 400; font-size: 13.5px; }
-/* メモ欄にはサークル名が入る。1 行で切ると会場で肝心の名前が読めないので 2 行まで出す */
+.stop__loc { font-size: 17px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
+.stop__loc u { text-decoration: none; color: var(--ink3); font-weight: 400; font-size: 13px; }
+
+/* サークル名。1 行で切ると会場で肝心の名前が読めないので 2 行まで出す */
 .stop__lab {
-  font-size: 14px;
-  color: var(--sumi2);
-  margin-top: 3px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 4px;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -481,29 +728,47 @@ button {
   overflow-wrap: anywhere;
 }
 
+.stop__lab.none { color: var(--ink3); font-weight: 400; }
+
+/* 配置しか分からないときの逃げ道。名前を調べに行くための外部検索 (要通信)。
+   押しても消し込みが動かないよう、クリックは JS 側で止めている。 */
+.stop__find {
+  display: inline-block;
+  margin-top: 6px;
+  white-space: nowrap;   /* 「（要通信）」だけ折り返すと読みにくい */
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--aqua-d);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--line2);
+}
+
+.stop__find:hover { color: var(--aqua-x); border-bottom-color: var(--aqua); }
+
 .stop__time {
-  flex: 0 0 84px;
+  flex: 0 0 88px;
   text-align: right;
-  padding: 10px 10px;
-  border-left: 1px dashed var(--rule2);
+  padding: 11px 10px;
+  border-left: 1px dashed var(--line2);
   white-space: nowrap;
 }
 
-.stop__time b { display: block; font-size: 20px; font-weight: 900; line-height: 1.2; }
-.stop__time small { font-size: 11.5px; color: var(--sumi3); }
+.stop__time b { display: block; font-size: 20px; font-weight: 900; line-height: 1.2; color: var(--aqua-x); }
+.stop__time small { font-size: 11.5px; color: var(--ink3); }
 
 .stop__chk {
   flex: 0 0 46px;
-  border-left: 1px solid var(--rule);
+  border-left: 1px solid var(--line);
   background: transparent;
-  color: var(--rule2);
+  color: var(--line2);
   font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.stop.done .stop__chk { color: var(--ai); }
+.stop.done .stop__chk { color: var(--aqua); }
 
 /* 狭い画面では左右の固定カラムを詰めて、サークル名/メモの幅を確保する。
    文字サイズは落とさない (会場で読めなくなる) */
@@ -513,10 +778,10 @@ button {
   .stop__sym b { font-size: 27px; }
   .stop__main { padding: 9px 9px; }
   .stop__loc { font-size: 16px; }
-  .stop__time { flex: 0 0 72px; padding: 9px 7px; }
+  .stop__time { flex: 0 0 74px; padding: 9px 7px; }
   .stop__time b { font-size: 18px; }
   .stop__chk { flex: 0 0 38px; font-size: 21px; }
-  .pill { margin-left: 5px; padding: 1px 5px; }
+  .pill { margin-left: 5px; padding: 1px 6px; }
 }
 
 .pill {
@@ -524,50 +789,48 @@ button {
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  padding: 1px 7px;
+  padding: 1px 8px;
   margin-left: 7px;
   color: #fff;
+  border-radius: 999px;
   vertical-align: 2px;
 }
+
+.pill.p12 { background: var(--rose); }
+.pill.p3 { background: var(--aqua-d); }
+.pill.p45 { background: var(--ink2); }
 
 /* ---------- 注意/繰り越し ---------- */
 
 .notice {
   margin-top: 18px;
-  border: 1px solid var(--rule2);
-  border-left: 7px solid var(--ai);
+  border: 1px solid var(--line2);
+  border-left: 6px solid var(--aqua);
+  border-radius: 12px;
   background: var(--card);
-  padding: 13px 15px;
+  padding: 14px 16px;
   font-size: 14px;
-  color: var(--sumi2);
+  color: var(--ink2);
+  box-shadow: var(--shadow);
 }
 
-.notice.bad { border-left-color: var(--shu); }
-.notice b { color: var(--sumi); }
-.notice ul { margin: 7px 0 0; padding-left: 20px; }
+.notice.bad { border-left-color: var(--rose); background: var(--rose-1); }
+.notice b { color: var(--ink); }
+.notice ul { margin: 8px 0 0; padding-left: 20px; }
+.notice li { margin-top: 3px; }
 
 .empty {
-  border: 1px dashed var(--rule2);
-  padding: 34px 16px;
+  border: 1.5px dashed var(--line2);
+  border-radius: var(--r);
+  background: rgba(255, 255, 255, .6);
+  padding: 46px 20px;
   text-align: center;
-  color: var(--sumi2);
+  color: var(--ink2);
   font-size: 14.5px;
+  line-height: 1.9;
 }
 
-/* ---------- フッタ ---------- */
-
-footer {
-  margin-top: 40px;
-  border-top: 1px solid var(--rule2);
-  padding: 18px 2px 0;
-  font-size: 13px;
-  color: var(--sumi2);
-  line-height: 1.8;
-}
-
-footer a { color: var(--ai); }
-
-.grid-full { grid-column: 1 / -1; }
+.empty b { display: block; color: var(--aqua-x); font-size: 16px; margin-bottom: 4px; }
 
 /* ---------- インストール案内 ---------- */
 
@@ -575,12 +838,68 @@ footer a { color: var(--ai); }
   display: none;
   align-items: center;
   gap: 12px;
-  border: 1px solid var(--ai);
-  background: var(--ai-pale);
+  border: 1px solid var(--aqua);
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--sky-1), #fff);
   padding: 13px 15px;
   font-size: 14px;
+  color: var(--ink2);
   margin-top: 18px;
 }
 
 .install.on { display: flex; }
-.install button { margin-left: auto; background: var(--ai); color: #fff; padding: 10px 16px; font-size: 14px; }
+
+.install button {
+  margin-left: auto;
+  flex: 0 0 auto;
+  background: var(--aqua);
+  color: #fff;
+  padding: 10px 18px;
+  font-size: 14px;
+  border-radius: 999px;
+}
+
+.install button:hover { background: var(--aqua-d); }
+
+/* ---------- フッタ ---------- */
+/* main のグリッドの中に置くと、貼り付く左カラムや最後のボタンと重なる事故が起きる。
+   ページ幅いっぱいの帯として main の外に出しておく。 */
+
+.site-foot {
+  margin-top: 34px;
+  padding: 44px 14px 30px;
+  background: linear-gradient(170deg, #12557c 0%, #0d3f5f 60%, #0a3450 100%);
+  color: #cfe6f3;
+  font-size: 13.5px;
+  line-height: 1.9;
+}
+
+.site-foot__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
+  gap: 26px 34px;
+}
+
+.site-foot h3 {
+  margin: 0 0 7px;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #fff;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(255, 255, 255, .18);
+}
+
+.site-foot p { margin: 0; }
+
+.site-foot__end {
+  max-width: 1120px;
+  margin: 32px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, .16);
+  font-size: 11.5px;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, .62);
+}

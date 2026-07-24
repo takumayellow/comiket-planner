@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>コミケ巡回プランナー ｜ 行きたいサークルから回る順を組む</title>
-<meta name="description" content="行きたいサークルのブロック記号と番号を入れるだけで、完売リスク・優先度・ホール間の移動を考えた巡回順を計算します。通信なしでも動きます。">
-<meta name="theme-color" content="#f4f1ea">
+<meta name="description" content="行きたいサークルを思いついた順に書くだけで、完売リスク・優先度・ホール間の移動を考えた巡回順を計算します。通信なしでも動きます。">
+<meta name="theme-color" content="#e8f5fd">
 <meta property="og:title" content="コミケ巡回プランナー">
 <meta property="og:description" content="行きたいサークルから回る順を計算。会場の圏外でも動くオフライン対応。">
 <meta property="og:type" content="website">
@@ -18,27 +18,41 @@
 </head>
 <body>
 
-<header class="masthead">
-  <div class="masthead__stripe"></div>
-  <div class="masthead__body">
-    <div>
-      <h1>コミケ<em>巡回</em>プランナー</h1>
-      <div class="tag">行きたいサークル → 回る順を計算する</div>
-    </div>
-    <div class="masthead__meta"><span id="meta">C108 / 東京ビッグサイト</span><br><span id="hours"></span></div>
+<header class="hero">
+  <div class="hero__sky" aria-hidden="true">
+    <i class="cloud cloud--a"></i><i class="cloud cloud--b"></i><i class="cloud cloud--c"></i>
+    <i class="glass"></i>
   </div>
+  <div class="hero__inner">
+    <p class="hero__eyebrow"><span id="meta">C108</span></p>
+    <h1>コミケ<em>巡回</em>プランナー</h1>
+    <p class="hero__lead">
+      行きたいサークルを思いついた順に書くだけ。<br class="br-sp">
+      壁の完売リスク・優先度・ホール間の移動時間を織り込んで、回る順を組み立てます。
+    </p>
+    <dl class="hero__facts">
+      <div><dt>会場</dt><dd id="venue">東京ビッグサイト</dd></div>
+      <div><dt>サークル頒布</dt><dd id="hours">10:30 — 16:00</dd></div>
+      <div><dt>通信</dt><dd>不要（端末内で計算）</dd></div>
+    </dl>
+  </div>
+  <div class="hero__arc" aria-hidden="true"></div>
 </header>
 
 <main>
   <div class="col-in">
-    <section>
-      <h2>行きたいリスト <span>しゃべるか、まとめて貼るだけ</span></h2>
+    <section class="card card--in">
+      <h2><span class="eyebrow">STEP 1</span>行きたいリスト<span class="sub">思いついた順に、話し言葉のままで</span></h2>
 
       <div class="mic" id="mic" hidden>
         <button class="btn-mic" type="button" id="micBtn" aria-pressed="false">
           <i></i><span id="micLabel">声で入れる</span>
         </button>
         <span class="mic__live" id="micLive" aria-live="polite"></span>
+        <span class="mic__note" id="micNote">
+          音声認識はブラウザの機能を使います。端末内で処理できない環境では、
+          <b>音声がブラウザ提供元のサーバへ送られ、通信も必要になります</b>。
+        </span>
       </div>
 
       <textarea id="text" spellcheck="false" aria-label="行きたいリスト"
@@ -48,21 +62,23 @@
         <button type="button" data-fill="clear">全部消す</button>
       </div>
       <p class="hint">
-        <b>改行も記号も要りません。</b>思いついた順にそのまま書いて（しゃべって）ください。
-        地区(東・西・南)＋ブロック記号＋番号を見つけて1件ずつに切り分け、
-        <b>「絶対」「できれば」「ついでに」</b>のような言い方から優先度を推し量ります。
-        <b>あ36-39</b> の範囲、<b>あ36,38,39</b> の列挙も読みます。
-        優先度を自分で決めたいときは <b>*1〜*5</b> と書けばそちらが優先されます。
+        文章の中から <b>地区（東・西・南）＋ブロック記号＋番号</b> を探して、1件ずつに切り分けます。
+        <b>あ36-39</b> のような範囲や <b>あ36,38,39</b> のような並びは、まとめて1件として読みます。
+        優先度は<b>「絶対」「本命」「できれば」「ついでに」</b>といった言い回しから推し量ります。
+        自分で決めたいときは <b>*1〜*5</b> と書けば、そちらを優先します。
       </p>
 
       <div class="read" id="read" hidden>
         <div class="read__head">
           <b>読み取り結果</b>
-          <span>優先度はこちらで推定しています。違っていれば直してください</span>
+          <span>優先度は推定です。サークル名を書き足すと、当日そのまま目印になります</span>
         </div>
         <div id="readList"></div>
       </div>
+    </section>
 
+    <section class="card card--in">
+      <h2><span class="eyebrow">STEP 2</span>使える時間<span class="sub">帰る時刻から逆算します</span></h2>
       <div class="fields">
         <div>
           <label class="f" for="start">回りはじめる</label>
@@ -98,22 +114,22 @@
       <button class="btn-go" id="go" type="button">巡回順を計算する</button>
 
       <div class="install" id="install">
-        ホーム画面に追加すると、通信がなくてもアプリとして開けます。
+        <span>ホーム画面に追加すると、通信がなくてもアプリとして開けます。</span>
         <button type="button" id="installBtn">追加</button>
       </div>
     </section>
   </div>
 
   <div class="col-out">
-    <section id="out" hidden>
-      <h2>結果</h2>
+    <section class="card" id="out" hidden>
+      <h2><span class="eyebrow">RESULT</span>組み上がった1日</h2>
       <div class="summary" id="summary"></div>
       <div class="progress"><i id="pbar"></i></div>
       <p class="hint" id="slack"></p>
     </section>
 
-    <section id="mapsec" hidden>
-      <h2>会場の概略図 <span>／ 自前の座標モデル</span></h2>
+    <section class="card" id="mapsec" hidden>
+      <h2><span class="eyebrow">MAP</span>会場の概略図<span class="sub">自前の座標モデル</span></h2>
       <div class="mapwrap" id="mapwrap"></div>
       <div class="legend">
         <span><i class="p12"></i>優先1・2</span>
@@ -125,8 +141,8 @@
       <p class="hint">公式の地図画像は使っていません。ゾーンの相対位置・島と壁の並びを自前で組んだ概略図です。実際の配置は公式の会場案内で確認してください。</p>
     </section>
 
-    <section id="listsec" hidden>
-      <h2>巡回順 <span>／ 押すと消し込み</span></h2>
+    <section class="card" id="listsec" hidden>
+      <h2><span class="eyebrow">ROUTE</span>巡回順<span class="sub">押すと消し込み</span></h2>
       <div id="stops"></div>
       <div class="btn-row">
         <button class="btn-sub" type="button" id="resetChk">チェックを全部消す</button>
@@ -137,20 +153,33 @@
     <section id="extra"></section>
 
     <div class="empty" id="empty">
-      左（上）のリストに行きたいサークルを入れて「巡回順を計算する」を押してください。
+      <b>まだ何も組んでいません。</b>
+      左（上）のリストに行きたいサークルを入れて、「巡回順を計算する」を押してください。
     </div>
   </div>
-
-  <footer class="grid-full">
-    <b>計算はすべてこの端末の中で完結します。</b>入力したリストはサーバへ送信されず、端末内（localStorage）にだけ保存されます。
-    一度開けば通信がなくても動くので、会場で圏外になっても使えます。
-    ただし<b>音声入力を使ったときだけ</b>は例外で、ブラウザ内蔵の音声認識が働くため、音声がブラウザ提供元のサーバへ送られる場合があります
-    （文字になった後の処理はすべて端末内です）。圏外では音声入力だけが使えません。<br>
-    サークル名のデータベースは持っていません（配置は自分で調べて入力してください）。会場の概略図は公式の地図を複製したものではなく、
-    ホール寸法などから独自に組んだ位置モデルです。待機列・入場口・配置の最終確認は必ず公式の発表で行ってください。<br>
-    移動と滞在の見積りは「大半の島は並ばずに数分、行列ができるのは一部だけ」という前提のモデルです。実際の行列は状況で大きく変わります。
-  </footer>
 </main>
+
+<footer class="site-foot">
+  <div class="site-foot__inner">
+    <div>
+      <h3>端末の中だけで動きます</h3>
+      <p>入力したリストはサーバへ送信されず、端末内（localStorage）にだけ保存されます。一度開けば通信がなくても動くので、会場で圏外になっても計算できます。</p>
+    </div>
+    <div>
+      <h3>音声入力だけは例外</h3>
+      <p>ブラウザの音声認識を使うため、端末内で処理できない環境では音声がブラウザ提供元のサーバへ送られ、通信も必要になります。文字になった後の処理はすべて端末内です。</p>
+    </div>
+    <div>
+      <h3>サークル名は持っていません</h3>
+      <p>配置のデータベースは同梱していません。場所はご自身で調べて入力してください。読み取り結果にサークル名を書き足すと、巡回順とコピーしたテキストに残ります。</p>
+    </div>
+    <div>
+      <h3>地図と所要時間について</h3>
+      <p>概略図は公式地図の複製ではなく、ホール寸法などから独自に組んだ位置モデルです。所要時間は「大半の島は並ばずに数分、行列は一部だけ」という前提の見積りで、実際は状況で大きく変わります。待機列・入場口・配置の最終確認は必ず公式の発表で行ってください。</p>
+    </div>
+  </div>
+  <p class="site-foot__end">Comic Market 108 ／ 非公式ツール</p>
+</footer>
 
 <script type="module" src="./js/app.js"></script>
 </body>

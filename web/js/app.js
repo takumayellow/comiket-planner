@@ -8,7 +8,11 @@ import { placementKey } from './catalog.js';
 import { groupByBlock, noGrouping, formatNumbers } from './group.js';
 import { planRoute, pyRound, hhmmToMin, minToHhmm } from './router.js';
 import { renderMap, priorityClass } from './map.js';
-import { isSupported as micOk, createRecorder } from './voice.js';
+import { isSupported as micOk, createRecorder, localReady } from './voice.js';
+
+// サークル名を調べに行くための外部検索。配置のデータベースは同梱していないので
+// (再配布不可)、「場所しか分からない」ときの逃げ道はこれしかない。要通信。
+const SEARCH = 'https://duckduckgo.com/?q=';
 
 const $ = (s) => document.querySelector(s);
 const LS = 'cp.';
@@ -34,6 +38,7 @@ let state = {
   unparsed: [],
   entries: [],
   prio: new Map(),   // 推定に納得いかないときの手動上書き (配置キー → 優先度)
+  name: new Map(),   // 手で足したサークル名 (配置キー → 名前)。空文字も上書きとして残す
 };
 
 // ---------- 保存 ----------
@@ -64,6 +69,11 @@ function savePrio() {
     JSON.stringify(Object.fromEntries(state.prio))));
 }
 
+function saveName() {
+  ls(() => localStorage.setItem(`${LS}name`,
+    JSON.stringify(Object.fromEntries(state.name))));
+}
+
 function restore() {
   const get = (k, d = null) => ls(() => localStorage.getItem(`${LS}${k}`), d);
   $('#text').value = get('text') ?? SAMPLE;
@@ -83,6 +93,8 @@ function restore() {
     || new Set();
   state.prio = ls(() => new Map(Object.entries(JSON.parse(get('prio') || '{}'))
     .map(([k, v]) => [k, Number(v)])), new Map()) || new Map();
+  state.name = ls(() => new Map(Object.entries(JSON.parse(get('name') || '{}'))
+    .map(([k, v]) => [k, String(v)])), new Map()) || new Map();
 }
 
 // ---------- 使える時間 ----------
@@ -139,20 +151,44 @@ function renderBudgetNote() {
 // 「何をどう読んだか」と「どの言葉を根拠にしたか」を必ず画面に出して、
 // その場で直せるようにする (黙って推定して黙って使うことはしない)。
 
+// 手動上書きを覚えておくキー。地区まで含め、同じ場所を2件書いたときは連番で分ける
+// (地区を落とすと 西あ36 と 東あ36 が同一視され、片方の上書きが両方に効いてしまう)。
+function entryKey(e, seen) {
+  const base = e.placements.map((p) => `${p.district}${placementKey(p)}`).join(',');
+  if (!base) return '';
+  const n = (seen.get(base) || 0) + 1;
+  seen.set(base, n);
+  return n === 1 ? base : `${base}#${n}`;
+}
+
 function readEntries() {
-  const entries = parseFreeText($('#text').value);
-  for (const e of entries) {
-    e.key = e.placements.map(placementKey).join(',');
-    const ov = e.key ? state.prio.get(e.key) : null;
-    if (ov) {
-      e.inferred = e.priority;
-      e.priority = ov;
-      e.overridden = true;
-      for (const p of e.placements) p.priority = ov;
-    }
-  }
+  const seen = new Map();
+  const entries = parseFreeText($('#text').value).map((e) => {
+    const key = entryKey(e, seen);
+    const ov = key ? state.prio.get(key) : null;
+    // 名前は空文字も「手で消した」という意思なので、has で見て素通しする
+    const named = !!key && state.name.has(key);
+    const label = named ? state.name.get(key) : e.label;
+    const priority = ov || e.priority;
+    return {
+      ...e,
+      key,
+      label,
+      named,
+      priority,
+      inferred: e.priority,
+      overridden: !!ov,
+      placements: e.placements.map((p) => ({ ...p, priority, label })),
+    };
+  });
   state.entries = entries;
   return entries;
+}
+
+/** 配置しか分からないときに名前を調べに行くための検索 URL (要通信)。 */
+function findUrl(p, nums) {
+  const q = `${LAYOUT_DOC.event || 'コミックマーケット'} ${p.district}${p.block}${nums} サークル`;
+  return SEARCH + encodeURIComponent(q);
 }
 
 function readRow(e) {
@@ -168,12 +204,16 @@ function readRow(e) {
   const col = priorityClass(e.priority);
   const opts = [1, 2, 3, 4, 5].map((n) => `<option value="${n}"`
     + `${n === e.priority ? ' selected' : ''}>優先${n}</option>`).join('');
-  const cue = e.overridden ? `手で変更（推定は優先${e.inferred}）`
-    : e.explicit ? `「${esc(e.cue)}」と書いてある`
-      : e.cue ? `「${esc(e.cue)}」から` : '手がかりが無いので既定';
+  const cue = e.overridden ? `優先度は手で変更（推定は優先${e.inferred}）`
+    : e.explicit ? `優先度は「${esc(e.cue)}」と書いてある`
+      : e.cue ? `優先度は「${esc(e.cue)}」から推定` : '手がかりが無いので優先度は既定';
+  // サークル名は文面から拾えないことのほうが多い。ここで書き足せると、
+  // 巡回順・コピーしたテキストにそのまま出て「どこの何なのか」が分かる。
   return `<div class="rd">
     <span class="rd__loc ${col}">${esc(hall)} ${esc(p.block)}${esc(nums)}</span>
-    <span class="rd__lab">${esc(e.label || '—')}</span>
+    <input class="rd__name" type="text" data-k="${esc(e.key)}"
+      value="${esc(e.label || '')}" placeholder="サークル名・目印（任意）"
+      aria-label="サークル名">
     <span class="rd__cue">${cue}</span>
     <select class="rd__sel" data-k="${esc(e.key)}" aria-label="優先度">${opts}</select>
   </div>`;
@@ -187,6 +227,14 @@ function renderRead(entries = readEntries()) {
       state.prio.set(sel.dataset.k, parseInt(sel.value, 10));
       savePrio();
       if (state.plan) compute(); else renderRead();
+    });
+  }
+  // 打ち込みの途中で描き直すと入力欄からフォーカスが飛ぶので、確定 (change) で拾う
+  for (const inp of document.querySelectorAll('.rd__name')) {
+    inp.addEventListener('change', () => {
+      state.name.set(inp.dataset.k, inp.value.trim());
+      saveName();
+      if (state.plan) compute();
     });
   }
   return entries;
@@ -299,6 +347,13 @@ function stopRow(s, i) {
   const col = priorityClass(p.priority);   // 色は CSS クラスで当てる (CSP対応)
   const done = state.done.has(p.groupKey) ? ' done' : '';
   const labels = [...new Set(items.map((x) => x.label).filter(Boolean))];
+  // 名前が無いと当日「ここは何だったか」が分からない。書いてあれば太く出し、
+  // 無ければ調べに行く導線を出す (押しても消し込みは動かない)。
+  const name = labels.length
+    ? `<div class="stop__lab">${esc(labels.join(' / '))}</div>`
+    : `<div class="stop__lab none">名前は未記入</div>
+       <a class="stop__find" href="${esc(findUrl(p, nums))}"
+         target="_blank" rel="noopener noreferrer">調べる（要通信）</a>`;
   return `<div class="stop${done}" data-k="${esc(p.groupKey)}">
     <div class="stop__no">${i + 1}</div>
     <div class="stop__sym ${col}${s.wall ? ' wall' : ''}">
@@ -307,7 +362,7 @@ function stopRow(s, i) {
       <div class="stop__loc">${esc(hall)} ${esc(p.block)}${esc(nums)}
         <u>${s.wall ? '壁' : '島'}</u>
         <span class="pill ${col}">優先${p.priority}</span></div>
-      <div class="stop__lab">${esc(labels.join(' / ') || '—')}</div>
+      ${name}
     </div>
     <div class="stop__time"><b>${s.arrival}</b>
       <small>${s.walkFromPrev >= 0.5 ? `移動+${Math.round(s.walkFromPrev)}分` : '—'}</small></div>
@@ -317,7 +372,9 @@ function stopRow(s, i) {
 
 function bindStops() {
   for (const el of document.querySelectorAll('.stop')) {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', (ev) => {
+      // 「名前を調べる」を押しただけで消し込まれると、戻ってきたとき混乱する
+      if (ev.target.closest('.stop__find')) return;
       const k = el.dataset.k;
       if (state.done.has(k)) state.done.delete(k); else state.done.add(k);
       el.classList.toggle('done');
@@ -335,9 +392,11 @@ function syncProgress() {
   $('#pbar').style.width = total ? `${(d / total) * 100}%` : '0';
 }
 
-function notice(kind, title, items) {
+// itemsHtml は「呼ぶ側で esc 済みの HTML」。中身に色付けを入れたい箇所があるので
+// ここでは素通しする。生のユーザー入力を渡さないこと。
+function notice(kind, title, itemsHtml) {
   return `<div class="notice ${kind}">
-    <b>${esc(title)}</b><ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul></div>`;
+    <b>${esc(title)}</b><ul>${itemsHtml.map((x) => `<li>${x}</li>`).join('')}</ul></div>`;
 }
 
 function asText() {
@@ -349,9 +408,11 @@ function asText() {
     const p = s.placement;
     const items = state.groups.get(p.groupKey) || [p];
     const hall = layout.hallOf(p.block, p.number) || p.district || '';
+    // 名前は代表1件ではなく、まとめた全件から拾う (島でまとめると名前が消えてしまう)
+    const labels = [...new Set(items.map((x) => x.label).filter(Boolean))];
     return `${i + 1}. ${s.arrival} ${hall} ${p.block}`
       + `${formatNumbers(items.map((x) => x.number))}`
-      + `${p.label ? ` (${p.label})` : ''}`;
+      + `${labels.length ? ` (${labels.join(' / ')})` : ''}`;
   });
   return [head, ...body].join('\n');
 }
@@ -360,9 +421,10 @@ function hhmm(v) {
   return `${String(Math.floor(v / 60) % 24).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
 }
 
+// 属性は必ず " で囲っているが、' も落としておく (囲み方を変えたときの事故防止)
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ---------- 起動 ----------
@@ -374,8 +436,9 @@ for (const id of ['#start', '#end']) {
 }
 restore();
 renderBudgetNote();
-$('#meta').innerHTML = `${esc(LAYOUT_DOC.event || '')}<br>${esc(LAYOUT_DOC.venue || '')}`;
-$('#hours').textContent = `サークル ${OPEN}〜${CLOSE}`;
+$('#meta').textContent = LAYOUT_DOC.event || 'コミックマーケット';
+$('#venue').textContent = LAYOUT_DOC.venue || '東京ビッグサイト';
+$('#hours').textContent = `${OPEN} — ${CLOSE}`;
 if ($('#text').value.trim()) compute();
 
 $('#go').addEventListener('click', compute);
@@ -424,6 +487,7 @@ $('#zoomBtn').addEventListener('click', () => {
 if (micOk()) {
   $('#mic').hidden = false;
   const live = $('#micLive');
+  const note = $('#micNote');
   // 認識中の途中経過とエラー文言が同じ場所を取り合う。エラーは次に押すまで消さない
   // (エラー直後に end イベントが来るので、素直に書くと一瞬で消えて原因が分からない)。
   let msg = '';
@@ -435,23 +499,44 @@ if (micOk()) {
       save();
       renderRead();
     },
-    onInterim: (t) => { live.textContent = t || msg; },
+    onInterim: (t) => {
+      live.textContent = t || msg;
+      live.classList.toggle('bad', !t && !!msg);
+    },
     onState: (s) => {
       const on = s === 'on';
       $('#micBtn').classList.toggle('on', on);
       $('#micBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
       $('#micLabel').textContent = on ? '録音中 — 押すと止める' : '声で入れる';
-      if (on) { msg = ''; live.textContent = ''; }
+      if (on) { msg = ''; live.textContent = ''; live.classList.remove('bad'); }
     },
-    onError: (m) => { msg = m; live.textContent = m; },
+    onError: (m) => { msg = m; live.textContent = m; live.classList.add('bad'); },
+    // 端末内で認識できたかどうかで、注意書きの中身が変わる。黙って切り替えない
+    onMode: (m) => showMode(m === 'local'),
   });
+  function showMode(local) {
+    note.classList.toggle('local', local);
+    note.innerHTML = local
+      ? 'この端末の中で認識しています。<b>音声は外へ送られません。</b>'
+      : '端末内での認識が使えないため、<b>音声はブラウザ提供元のサーバへ送られます</b>'
+        + '（通信も必要です）。文字にした後の処理はすべて端末内です。';
+  }
+  // 押す前でも分かるように、開いた時点で使えるなら注意書きを先に直しておく。
+  // (使えない場合は書き換えない。用意すれば使えるようになることがある)
+  localReady().then((ok) => { if (ok) showMode(true); });
   $('#micBtn').addEventListener('click', () => (rec.active ? rec.stop() : rec.start()));
+  // タブを離れたら勝手に止める。押しっぱなしで放置すると、その間の音声が
+  // ブラウザ提供元へ送られ続けることになる。
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && rec.active) rec.stop();
+  });
 } else {
   // 非対応 (iOS の一部 / Firefox)。キーボードのマイクキーなら同じことができる
   $('#mic').hidden = false;
   $('#micBtn').hidden = true;
   $('#micLive').textContent = 'このブラウザは音声入力に対応していません。'
     + 'キーボードのマイクのキーから声で入力できます。';
+  $('#micNote').hidden = true;
 }
 
 // ホーム画面に追加 (対応ブラウザのみ)

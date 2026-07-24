@@ -30,7 +30,7 @@ _BLK = re.escape(
 _SPAN = re.compile(
     rf"(?:[東西南]\s*(?:地区)?\s*(?:の)?\s*)?[{_BLK}]\s*\d{{1,3}}"
     r"(?:\s*[-〜~ー]\s*\d{1,3})?(?:\s*[ab])?"
-    r"(?:\s*[,、，・]\s*\d{1,3}\s*[ab]?)*", re.I)
+    r"(?:\s*[,、，・]\s*\d{1,3}(?:\s*[-〜~ー]\s*\d{1,3})?\s*[ab]?)*", re.I)
 
 # 件と件の切れ目になりうるもの。話し言葉の接続詞まで見るのは、書き起こしに
 # 句読点がほとんど入らないため (「〜欲しいあと西の〜」で切れないと1件に潰れる)。
@@ -71,13 +71,41 @@ _CUES: tuple[tuple[str, int, int], ...] = (
     ("見られたら", 5, 4), ("おまけ", 5, 4), ("後回し", 5, 4),
 )
 
-_LABEL_DROP = re.compile(r"\*\s*[1-5](?![0-9])|地区")
+# ラベルに残っても名前の役に立たないもの。優先度の指定と、配置の前に書かれがちな
+# ホール名 (「東5 ア86-88」の「東5」) を落とす。
+_LABEL_DROP = re.compile(
+    r"\*\s*[1-5](?![0-9])"
+    r"|優先(?:度)?\s*[:：]?\s*[1-5](?![0-9])"
+    r"|地区"
+    r"|[東西南]\s*\d{1,3}(?:\s*[・,、]\s*\d{1,3})*(?:\s*ホール)?")
 _LABEL_EDGE = " 　\t,、，.。・:：;；/|｜!！?？「」『』\"'"
 # 配置を抜いた跡に残る助詞。「あ36の○○」→「○○」。落とすのは配置に「くっついて
 # いる」1文字だけ。間に空白があるものは助詞ではなく本文の頭 (「東H07 のんのん
 # びより」の「の」) なので触らない。
 _JOSHI_HEAD = re.compile(r"^[のはがをにへともでや]")
 _JOSHI_TAIL = re.compile(r"[のはがをにへともでや]$")
+
+# 優先度の言い回しはサークル名ではない。「ついででいいや」をサークル名として
+# 巡回順に出しても当日の役に立たないので、末尾が手がかり語と助詞だけでできて
+# いる範囲を切り落とす。途中では切らない — 名前そのものに手がかり語が入る
+# ことがある (「推しの子」の「推し」を抜くと別物になる)。
+_MODAL: tuple[str, ...] = (
+    "欲しい", "ほしい", "買いたい", "買う", "行きたい", "行く", "見たい", "見る",
+    "回りたい", "回る", "寄りたい", "寄る", "取りたい", "取る", "したい", "する",
+    "いいや", "いい", "大丈夫", "あるはず", "ある", "いる", "はず", "らしい",
+    "みたい", "かも", "思う", "予定", "チェック",
+)
+# 手がかり語同士をつなぐ言い方。これ自体は手がかりではないので hit にしない
+# (「絶対欲しいけどできれば」の「けど」を跨げないと、前半が名前として残る)。
+_JOIN: tuple[str, ...] = ("けれども", "けれど", "けど", "ので", "のに", "から",
+                          "って", "ても", "でも", "そして", "あと")
+_CUT_WORDS: tuple[str, ...] = tuple(sorted(
+    {w for w, _, _ in _CUES} | set(_MODAL), key=len, reverse=True))
+# 手がかり語の間に挟まってよい文字 (助詞・活用の尻尾・区切り)。
+_FILLER = frozenset(" 　\t,、，・/|｜!！?？。．のはがをにへともでやかなねよっただしまん")
+# 切り落とした後に残っても名前として意味を成さない語。
+_NOISE_LABEL = frozenset({"あたり", "へん", "とか", "など", "こと", "もの", "やつ",
+                          "ところ", "ほう", "サークル"})
 
 
 @dataclass
@@ -105,6 +133,19 @@ def _spans(text: str) -> list[tuple[int, int]]:
     return out
 
 
+def _cut_spans(text: str) -> list[tuple[int, int]]:
+    """件の切れ目を決めるための塊。読めた配置に加えて「地区付きなのに読めな
+    かった塊」も入れる。番号が範囲外の書き間違い (西す230) を隣の件に吸収させると、
+    その件が黙って消えたうえ隣に誤ったラベルが付く。独立した件として立てておけば
+    「場所を読み取れませんでした」に出る。
+    """
+    out: list[tuple[int, int]] = []
+    for m in _SPAN.finditer(text):
+        if parse_placement(m.group(0)) or m.group(0)[0] in "東西南":
+            out.append((m.start(), m.end()))
+    return out
+
+
 def split_entries(text: str) -> list[str]:
     """自由文を1件ずつの断片に切る。改行があってもなくても同じ結果に落とす。
 
@@ -112,7 +153,7 @@ def split_entries(text: str) -> list[str]:
     こうするとサークル名が前にある書き方 (「○○は西あ36、△△は東H07」) でも
     後にある書き方 (「西あ36の○○、東H07の△△」) でも同じように割れる。
     """
-    spans = _spans(text)
+    spans = _cut_spans(text)
 
     cuts = {0, len(text)}
     for i in range(1, len(spans)):
@@ -164,6 +205,34 @@ def infer_priority(text: str) -> tuple[int, str, bool]:
     return best[2], best[3], False
 
 
+def _is_cue_only(s: str) -> bool:
+    """s が手がかり語と助詞だけでできているか (手がかり語を1つは含むこと)。"""
+    hit = False
+    i = 0
+    while i < len(s):
+        word = next((w for w in _CUT_WORDS if s.startswith(w, i)), None)
+        if word:
+            i += len(word)
+            hit = True
+            continue
+        join = next((w for w in _JOIN if s.startswith(w, i)), None)
+        if join:
+            i += len(join)
+        elif s[i] in _FILLER:
+            i += 1
+        else:
+            return False
+    return hit
+
+
+def _strip_cue_tail(label: str) -> str:
+    """末尾の「手がかり語だけの部分」を落とす。全部そうなら空にする。"""
+    for i in range(len(label)):
+        if _is_cue_only(label[i:]):
+            return label[:i]
+    return label
+
+
 def _label_of(entry: str, span: tuple[int, int] | None) -> str:
     if span is None:
         label = entry
@@ -172,7 +241,10 @@ def _label_of(entry: str, span: tuple[int, int] | None) -> str:
         tail = _JOSHI_HEAD.sub("", entry[span[1]:], count=1)
         label = f"{head} {tail}"
     label = _LABEL_DROP.sub(" ", label)
-    return re.sub(r"\s+", " ", label).strip(_LABEL_EDGE)
+    label = re.sub(r"\s+", " ", label).strip(_LABEL_EDGE)
+    label = _strip_cue_tail(label).strip(_LABEL_EDGE)
+    label = _JOSHI_TAIL.sub("", label).strip(_LABEL_EDGE)
+    return "" if label in _NOISE_LABEL else label
 
 
 def parse_entry(entry: str) -> Entry:

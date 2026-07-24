@@ -16,7 +16,7 @@ const BLK = 'あいうえおかきくけこさしすせそたちつてとなに�
 const SPAN = new RegExp(
   `(?:[東西南]\\s*(?:地区)?\\s*(?:の)?\\s*)?[${BLK}]\\s*\\d{1,3}`
   + '(?:\\s*[-〜~ー]\\s*\\d{1,3})?(?:\\s*[ab])?'
-  + '(?:\\s*[,、，・]\\s*\\d{1,3}\\s*[ab]?)*', 'gi');
+  + '(?:\\s*[,、，・]\\s*\\d{1,3}(?:\\s*[-〜~ー]\\s*\\d{1,3})?\\s*[ab]?)*', 'gi');
 
 // 件と件の切れ目になりうるもの。話し言葉の接続詞まで見るのは、書き起こしに句読点が
 // ほとんど入らないため (「〜欲しいあと西の〜」で切れないと1件に潰れる)。
@@ -53,13 +53,37 @@ const CUES = [
   ['見られたら', 5, 4], ['おまけ', 5, 4], ['後回し', 5, 4],
 ];
 
-const LABEL_DROP = /\*\s*[1-5](?![0-9])|地区/g;
+// ラベルに残っても名前の役に立たないもの。優先度の指定と、配置の前に書かれがちな
+// ホール名 (「東5 ア86-88」の「東5」) を落とす。
+const LABEL_DROP = /\*\s*[1-5](?![0-9])|優先(?:度)?\s*[:：]?\s*[1-5](?![0-9])|地区|[東西南]\s*\d{1,3}(?:\s*[・,、]\s*\d{1,3})*(?:\s*ホール)?/g;
 const LABEL_EDGE = ' 　\t,、，.。・:：;；/|｜!！?？「」『』"\'';
 // 配置を抜いた跡に残る助詞。「あ36の○○」→「○○」。落とすのは配置に「くっついて
 // いる」1文字だけ。間に空白があるものは助詞ではなく本文の頭 (「東H07 のんのん
 // びより」の「の」) なので触らない。
 const JOSHI_HEAD = /^[のはがをにへともでや]/;
 const JOSHI_TAIL = /[のはがをにへともでや]$/;
+
+// 優先度の言い回しはサークル名ではない。「ついででいいや」をサークル名として巡回順に
+// 出しても当日の役に立たないので、末尾が手がかり語と助詞だけでできている範囲を切り
+// 落とす。途中では切らない — 名前そのものに手がかり語が入ることがある
+// (「推しの子」の「推し」を抜くと別物になる)。
+const MODAL = [
+  '欲しい', 'ほしい', '買いたい', '買う', '行きたい', '行く', '見たい', '見る',
+  '回りたい', '回る', '寄りたい', '寄る', '取りたい', '取る', 'したい', 'する',
+  'いいや', 'いい', '大丈夫', 'あるはず', 'ある', 'いる', 'はず', 'らしい',
+  'みたい', 'かも', '思う', '予定', 'チェック',
+];
+// 手がかり語同士をつなぐ言い方。これ自体は手がかりではないので hit にしない
+// (「絶対欲しいけどできれば」の「けど」を跨げないと、前半が名前として残る)。
+const JOIN = ['けれども', 'けれど', 'けど', 'ので', 'のに', 'から',
+  'って', 'ても', 'でも', 'そして', 'あと'];
+const CUT_WORDS = [...new Set([...CUES.map(([w]) => w), ...MODAL])]
+  .sort((a, b) => b.length - a.length);
+// 手がかり語の間に挟まってよい文字 (助詞・活用の尻尾・区切り)。
+const FILLER = new Set(' 　\t,、，・/|｜!！?？。．のはがをにへともでやかなねよっただしまん');
+// 切り落とした後に残っても名前として意味を成さない語。
+const NOISE_LABEL = new Set(['あたり', 'へん', 'とか', 'など', 'こと', 'もの', 'やつ',
+  'ところ', 'ほう', 'サークル']);
 
 /** 全角英数などをそろえる。以降の位置(index)はこの文字列基準で扱う。 */
 export function normalize(text) {
@@ -71,6 +95,20 @@ function spansOf(text) {
   SPAN.lastIndex = 0;
   for (const m of text.matchAll(SPAN)) {
     if (parsePlacement(m[0]).length) out.push([m.index, m.index + m[0].length]);
+  }
+  return out;
+}
+
+// 件の切れ目を決めるための塊。読めた配置に加えて「地区付きなのに読めなかった塊」も
+// 入れる。番号が範囲外の書き間違い (西す230) を隣の件に吸収させると、その件が黙って
+// 消えたうえ隣に誤ったラベルが付く。独立した件として立てれば読み取り結果に出る。
+function cutSpansOf(text) {
+  const out = [];
+  SPAN.lastIndex = 0;
+  for (const m of text.matchAll(SPAN)) {
+    if (parsePlacement(m[0]).length || '東西南'.includes(m[0][0])) {
+      out.push([m.index, m.index + m[0].length]);
+    }
   }
   return out;
 }
@@ -90,7 +128,7 @@ function trimEdges(s) {
  * 切れ目は「次の配置表記の直前にある最後の区切り」。区切りが無ければ配置の直前。
  */
 export function splitEntries(text) {
-  const spans = spansOf(text);
+  const spans = cutSpansOf(text);
 
   const cuts = new Set([0, text.length]);
   for (let i = 1; i < spans.length; i++) {
@@ -142,6 +180,37 @@ function stripSet(s, chars) {
   return s.slice(a, b);
 }
 
+/** s が手がかり語と助詞だけでできているか (手がかり語を1つは含むこと)。 */
+function isCueOnly(s) {
+  let hit = false;
+  let i = 0;
+  while (i < s.length) {
+    const word = CUT_WORDS.find((w) => s.startsWith(w, i));
+    if (word) {
+      i += word.length;
+      hit = true;
+      continue;
+    }
+    const join = JOIN.find((w) => s.startsWith(w, i));
+    if (join) {
+      i += join.length;
+    } else if (FILLER.has(s[i])) {
+      i += 1;
+    } else {
+      return false;
+    }
+  }
+  return hit;
+}
+
+/** 末尾の「手がかり語だけの部分」を落とす。全部そうなら空にする。 */
+function stripCueTail(label) {
+  for (let i = 0; i < label.length; i++) {
+    if (isCueOnly(label.slice(i))) return label.slice(0, i);
+  }
+  return label;
+}
+
 function labelOf(entry, span) {
   let label;
   if (!span) {
@@ -152,7 +221,10 @@ function labelOf(entry, span) {
     label = `${head} ${tail}`;
   }
   label = label.replace(LABEL_DROP, ' ').replace(/\s+/g, ' ');
-  return stripSet(label, LABEL_EDGE);
+  label = stripSet(label, LABEL_EDGE);
+  label = stripSet(stripCueTail(label), LABEL_EDGE);
+  label = stripSet(label.replace(JOSHI_TAIL, ''), LABEL_EDGE);
+  return NOISE_LABEL.has(label) ? '' : label;
 }
 
 /** 切り出し済みの断片1つを解釈する。 */

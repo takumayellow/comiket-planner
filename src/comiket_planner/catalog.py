@@ -77,34 +77,47 @@ def parse_placement(text: str) -> list[Placement]:
     if m:
         district = DISTRICTS.get(m.group(1).lower(), m.group(1))
 
-    out: list[Placement] = []
+    found: list[tuple[tuple[int, int], Placement]] = []   # (出現位置, 配置)
+    seen: set[tuple[str, int, str]] = set()
+    taken: list[tuple[int, int]] = []                     # 範囲が食った区間
 
-    # 「あ36-39」形式: ブロック直後に範囲
+    # 「あ36-39」形式: ブロック直後に範囲。「あ36,38-40」のように列挙の途中に
+    # 出てくる範囲 (記号なし) は、直前の区切りとブロック記号を引き継いで拾う。
     for bm in re.finditer(
-        rf"([{re.escape(_HIRA + _KANA + _LAT_UP + _LAT_LO)}])\s*"
+        rf"([{re.escape(_HIRA + _KANA + _LAT_UP + _LAT_LO)}])?\s*"
         r"(\d{1,3})\s*[-〜~ー]\s*(\d{1,3})", s):
         blk, lo, hi = bm.group(1), int(bm.group(2)), int(bm.group(3))
+        if blk is None:
+            before = s[max(0, bm.start() - 2):bm.start()]
+            if not re.search(r"[,、，・]\s*$", before):
+                continue
+            blk = _carry_block(s, bm.start())
         if blk not in VALID_BLOCKS or not (0 < lo <= hi <= 99):
             continue
+        taken.append((bm.start(), bm.end()))
         for n in range(lo, hi + 1):
-            out.append(Placement(block=blk, number=n, district=district, raw=raw))
-    if out:
-        return out
+            seen.add((blk, n, ""))
+            found.append(((bm.start(), n),
+                          Placement(block=blk, number=n, district=district, raw=raw)))
 
     # 「あ36,38,39」/ 単発「あ36a」。カンマ列挙のときだけブロック記号を引き継ぐ。
-    seen = set()
+    # 範囲を見つけても打ち切らない。打ち切ると「あ36-39,48」の 48 が黙って消える。
     last_block = ""
     token_re = re.compile(
         rf"([{re.escape(_HIRA + _KANA + _LAT_UP + _LAT_LO)}])?\s*"
         r"(\d{1,3})\s*([ab])?", re.I)
     for tm in token_re.finditer(s):
+        if any(lo <= tm.start() < hi for lo, hi in taken):
+            continue                                       # 範囲として展開済み
         blk = tm.group(1)
         num, ab = int(tm.group(2)), (tm.group(3) or "").lower()
         if blk is None:
-            # ブロック無しの裸番号: 直前が区切り(, 、・)のときだけ列挙とみなす
+            # ブロック無しの裸番号: 直前が区切り(, 、・)のときだけ列挙とみなす。
+            # 範囲の直後 (あ36-39,48) も列挙の続きなので、範囲のブロックを引き継ぐ。
             before = s[max(0, tm.start() - 2):tm.start()]
-            if last_block and re.search(r"[,、，・]\s*$", before):
-                blk = last_block
+            carry = last_block or _carry_block(s, tm.start())
+            if carry and re.search(r"[,、，・]\s*$", before):
+                blk = carry
             else:
                 continue
         if blk not in VALID_BLOCKS or not (0 < num <= 99):
@@ -114,9 +127,24 @@ def parse_placement(text: str) -> list[Placement]:
         if k in seen:
             continue
         seen.add(k)
-        out.append(Placement(block=blk, number=num, ab=ab,
-                             district=district, raw=raw))
-    return out
+        found.append(((tm.start(), num),
+                      Placement(block=blk, number=num, ab=ab,
+                                district=district, raw=raw)))
+
+    found.sort(key=lambda x: x[0])
+    return [p for _, p in found]
+
+
+_BLOCK_USE = re.compile(
+    rf"([{re.escape(_HIRA + _KANA + _LAT_UP + _LAT_LO)}])\s*\d")
+
+
+def _carry_block(s: str, pos: int) -> str:
+    """pos より前で最後に「記号+番号」として使われたブロック記号。"""
+    last = ""
+    for m in _BLOCK_USE.finditer(s, 0, pos):
+        last = m.group(1)
+    return last
 
 
 _PRIO_MARK = re.compile(r"\*\s*([1-5])(?![0-9])")

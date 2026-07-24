@@ -13,26 +13,26 @@ const PAD = 26;
 const GAP_IN = 32;   // 同じ棟のホール間
 const GAP_GRP = 50;  // 棟と棟の間
 
-// 公式の折り込み地図は白い紙にスミ一色 (彩度のある画素 0.00% を実測) なので、それに寄せる。
-// 棟の見出しだけ準備会サイトの藍。app.css の :root と対で管理すること。
+// 図は「白い紙に水色の線」。app.css の :root と対で管理すること
+// (--sky-*/--aqua-*/--ink*/--rose と同じ値を使う)。
 const C = {
-  paper: '#f4f1ea',
-  zone: '#ffffff',
-  zoneEdge: '#a2a0a0',
-  island: '#c9c8c8',
-  islandHit: '#595757',
-  wall: '#918b8a',
-  wallHit: '#231815',
-  code: '#231815',
-  label: '#595757',
-  row: '#444499',
-  link: '#a2a0a0',
+  paper: '#ffffff',    // 図の地。記号の縁取り(halo)にも使うので背景と必ず同色に
+  zone: '#f7fcff',
+  zoneEdge: '#b7d9ec',
+  island: '#c3e2f2',
+  islandHit: '#0f4f74',
+  wall: '#8fc2dd',
+  wallHit: '#0d3f5f',
+  code: '#0f4f74',
+  label: '#5c7c93',
+  row: '#2e9fd8',
+  link: '#a9c9dc',
 };
 
 export function stopColor(priority) {
-  if (priority <= 2) return '#b7282e';
-  if (priority === 3) return '#444499';
-  return '#595757';
+  if (priority <= 2) return '#d6385c';
+  if (priority === 3) return '#1a76a8';
+  return '#42627a';
 }
 
 /** HTML 側で使う色クラス。app.css の .p12/.p3/.p45 と対。 */
@@ -138,7 +138,7 @@ export function renderMap(layout, plan) {
       + `paint-order="stroke">${esc(s.placement.block)}</text>`);
     out.push(`<circle cx="${r(x)}" cy="${r(yy)}" r="8.6" `
       + `fill="${stopColor(s.placement.priority)}"`
-      + `${s.wall ? ' stroke="#231815" stroke-width="2"' : ''}/>`);
+      + `${s.wall ? ` stroke="${C.wallHit}" stroke-width="2"` : ''}/>`);
     out.push(`<text x="${r(x)}" y="${r(yy + 3.5)}" fill="#ffffff" font-size="10" `
       + `font-weight="700" text-anchor="middle">${i + 1}</text>`);
   });

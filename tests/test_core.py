@@ -142,3 +142,48 @@ def test_freeform_label_drops_place_and_particle():
     assert e.label == "ごちうさ"
     # 助詞は1文字だけ落とす (作品名の先頭を削らない)
     assert parse_free_text("東H07 のんのんびより")[0].label == "のんのんびより"
+
+
+def test_freeform_equal_weight_cues_take_the_later_one():
+    # 同じ重みの手がかりが並んだら後ろを採る (日本語は文末に本音が来る)
+    assert parse_free_text("東H08は絶対欲しいけどできれば")[0].priority == 4
+    assert parse_free_text("東H08はできれば絶対")[0].priority == 1
+
+
+def test_placement_mixes_range_and_enumeration():
+    # 「あ36-39,45」「あ36,38-40」。範囲と列挙が混ざっても取りこぼさない
+    assert [p.number for p in parse_placement("西あ36-39,45")] == [36, 37, 38, 39, 45]
+    assert [p.number for p in parse_placement("あ36,38-40")] == [36, 38, 39, 40]
+
+
+def test_freeform_keeps_unreadable_placement_as_its_own_entry():
+    # 番号が範囲外 (西す230) の書き間違いを隣の件に吸収させない
+    entries = parse_free_text("西す230、東H07")
+    assert len(entries) == 2
+    assert entries[0].placements == []
+    assert [p.block for p in entries[1].placements] == ["H"]
+
+
+def test_freeform_reads_fullwidth_digits_and_marker():
+    e = parse_free_text("西お３６の○○が絶対欲しい ＊２")[0]
+    assert e.placements[0].number == 36
+    assert e.priority == 2 and e.explicit is True
+
+
+def test_label_drops_priority_wording_and_hall_prefix():
+    # 「ついででいいや」はサークル名ではない。名前として意味のある部分だけ残す
+    assert parse_free_text("東5 ア86-88はついででいいや")[0].label == ""
+    assert parse_free_text("西のあ36の○○が絶対欲しい")[0].label == "○○"
+    assert parse_free_text("東H08あたりは時間があれば見たい")[0].label == ""
+    assert parse_free_text("西め37は優先2")[0].label == ""
+    # 手がかり語が接続表現でつながっていても、まとめて落とす
+    assert parse_free_text("東H08は絶対欲しいけどできれば")[0].label == ""
+    assert (parse_free_text("東方Projectのサークルが西R12bにいるらしいので必ず行く")[0].label
+            == "東方Projectのサークル")
+
+
+def test_label_keeps_names_that_contain_cue_words():
+    # 手がかり語が名前の一部に入っているだけなら削らない (途中では切らない)
+    assert parse_free_text("西き12の推しの子")[0].label == "推しの子"
+    assert parse_free_text("西あ36の絶対少女")[0].label == "絶対少女"
+    assert parse_free_text("のんのんびよりの新刊が東H07にあるはず")[0].label == "のんのんびよりの新刊"

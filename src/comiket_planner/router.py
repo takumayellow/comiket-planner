@@ -19,9 +19,29 @@ from .layout import Layout, Point
 # 優先度(1..5) → 基本の緊急度(売り切れ前に着きたい強さ) 0..1
 PRIORITY_URGENCY = {1: 0.95, 2: 0.80, 3: 0.55, 4: 0.35, 5: 0.20}
 
-DEFAULT_DWELL = 3.0        # 1サークルで並ぶ+買う時間 (分)。壁は別途上乗せ。
-WALL_DWELL_BONUS = 7.0     # 壁サークルは行列が長い
+# --- 現実的な滞在時間モデル(分) --------------------------------------------
+# コミケのサークル頒布は 10:30〜16:00。ただし「全サークルに行列」は誇張。実際は
+# 大半の島サークルは並ばず数分で見て買える。行列ができるのは一部の大手だけで、
+# しかも全部に並ぶ/全部買うわけでもない。→ 基本は短時間、行列分は控えめに上乗せ。
+# 1サークルの実所要 = 到達+立ち読み+(買う)(BASE) + 行列/規模ぶんの少量上乗せ。
+BASE_BROWSE = 4.0                                   # 島の一般サークル: 並ばず見て買う
+WALL_QUEUE = 4.0                                    # 壁は多少列ぶ(全部瞬殺ではない)
+PRIORITY_QUEUE = {1: 10.0, 2: 6.0, 3: 3.0, 4: 1.0, 5: 0.0}  # 興味度の代理。控えめ
+SPAN_QUEUE_PER = 0.3                                # 規模(スペース数)で微増
+SPAN_QUEUE_CAP = 12                                 # 大手でも頭打ち
+BROAD_BROWSE_BONUS = 4.0                            # 「全般的に見る」(周辺も覗く)ぶん
+CROWD_WALK_FACTOR = 1.25                            # 通路混雑で歩行が公称より少し延びる
 SELLOUT_HALFLIFE_MIN = 90  # 緊急度1.0のサークルが半分の価値になるまで(分)
+
+
+def _span(p: Placement) -> int:
+    for t in p.tags:
+        if t.startswith("span:"):
+            try:
+                return max(1, int(t.split(":", 1)[1]))
+            except ValueError:
+                return 1
+    return 1
 
 
 def _hhmm_to_min(s: str) -> int:
@@ -93,10 +113,25 @@ def _urgency(p: Placement, layout: Layout) -> float:
     return u
 
 
-def _dwell(p: Placement, layout: Layout) -> float:
+def _is_wall(p: Placement, layout: Layout) -> bool:
     hit = layout._index.get(p.block)
-    wall = bool(hit and hit[1]["kind"] == "wall")
-    return DEFAULT_DWELL + (WALL_DWELL_BONUS if wall else 0.0)
+    return bool(hit and hit[1]["kind"] == "wall")
+
+
+def _dwell(p: Placement, layout: Layout) -> float:
+    q = PRIORITY_QUEUE.get(p.priority, 9.0)
+    if _is_wall(p, layout):
+        q += WALL_QUEUE
+    q += min(_span(p) - 1, SPAN_QUEUE_CAP) * SPAN_QUEUE_PER
+    d = BASE_BROWSE + q
+    if "broad" in p.tags:
+        d += BROAD_BROWSE_BONUS
+    return d
+
+
+def _walk(layout: Layout, a: Point, b: Point) -> float:
+    """混雑で歩行時間が公称より延びる分を織り込む。"""
+    return layout.walk_minutes(a, b) * CROWD_WALK_FACTOR
 
 
 def _sellout_value(urgency: float, arrival_min: float, start_min: float) -> float:
@@ -134,7 +169,7 @@ def _objective(order, layout, start_pt, start_min):
     prev = start_pt
     cost = 0.0
     for (p, pt, u, d) in order:
-        w = layout.walk_minutes(prev, pt)
+        w = _walk(layout, prev, pt)
         t += w
         # 期待価値の取りこぼし(1 - value)を緊急度で重み付け
         val = _sellout_value(u, t, start_min)
@@ -153,7 +188,7 @@ def _greedy(nodes, layout, start_pt, start_min):
         best, best_score = None, None
         for cand in remaining:
             p, pt, u, d = cand
-            w = layout.walk_minutes(prev, pt)
+            w = _walk(layout, prev, pt)
             arr = t + w
             val = _sellout_value(u, arr, start_min)
             # 近い + 緊急 を優先: 小さいほど良い
@@ -163,7 +198,7 @@ def _greedy(nodes, layout, start_pt, start_min):
         order.append(best)
         remaining.remove(best)
         p, pt, u, d = best
-        t += layout.walk_minutes(prev, pt) + d
+        t += _walk(layout, prev, pt) + d
         prev = pt
     return order
 
@@ -187,6 +222,37 @@ def _two_opt(order, layout, start_pt, start_min, rounds=40):
     return best
 
 
+def _or_opt(order, layout, start_pt, start_min, rounds=25):
+    """1〜3連続の立ち寄りを別位置へ移す (or-opt)。2-optでは消せない
+    「棟を往復する無駄」(例: 東を回ったあと南へ戻る) を解消する。"""
+    best = order
+    best_cost, _ = _objective(best, layout, start_pt, start_min)
+    n = len(best)
+    improved = True
+    it = 0
+    while improved and it < rounds:
+        improved = False
+        it += 1
+        for seg in (1, 2, 3):
+            for i in range(n - seg + 1):
+                chunk = best[i:i + seg]
+                rest = best[:i] + best[i + seg:]
+                for j in range(len(rest) + 1):
+                    if j == i:
+                        continue
+                    cand = rest[:j] + chunk + rest[j:]
+                    c, _ = _objective(cand, layout, start_pt, start_min)
+                    if c + 1e-9 < best_cost:
+                        best, best_cost = cand, c
+                        improved = True
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+    return best
+
+
 def plan_route(placements: list[Placement], layout: Layout, *,
                start_zone: str | None = None,
                start_time: str = "10:30",
@@ -201,6 +267,8 @@ def plan_route(placements: list[Placement], layout: Layout, *,
     start_pt = layout.entrance_point(zone)
 
     order = _greedy(nodes, layout, start_pt, start_min)
+    order = _two_opt(order, layout, start_pt, start_min)
+    order = _or_opt(order, layout, start_pt, start_min)
     order = _two_opt(order, layout, start_pt, start_min)
 
     # 予算超過なら報酬密度の低いものから外す (prize-collecting)
@@ -220,12 +288,16 @@ def plan_route(placements: list[Placement], layout: Layout, *,
             order = order[:worst_i] + order[worst_i + 1:]
             order = _two_opt(order, layout, start_pt, start_min, rounds=15)
 
+    # 最終磨き込み: 棟往復の無駄(東→南のような戻り)を or-opt で除去
+    order = _or_opt(order, layout, start_pt, start_min)
+    order = _two_opt(order, layout, start_pt, start_min, rounds=15)
+
     # 時刻を確定
     stops = []
     t = start_min
     prev = start_pt
     for (p, pt, u, d) in order:
-        w = layout.walk_minutes(prev, pt)
+        w = _walk(layout, prev, pt)
         arr = t + w
         stops.append(RouteStop(p, pt, int(round(arr)), int(round(arr + d)), w, u))
         t = arr + d

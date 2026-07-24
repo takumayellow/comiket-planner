@@ -110,8 +110,11 @@ class Layout:
         if a.zone == b.zone:
             d = self._aisle_distance(a, b)
             return d / self.params["walk_speed_m_per_min"]
-        key = "|".join(sorted([a.zone, b.zone]))
-        return float(self.transfer.get(key, 20))
+        # transfer 表のキー順に依存しない (どちら向きでも引ける)
+        t = self.transfer.get(f"{a.zone}|{b.zone}")
+        if t is None:
+            t = self.transfer.get(f"{b.zone}|{a.zone}")
+        return float(t if t is not None else 20)
 
     def _aisle_distance(self, a: Point, b: Point) -> float:
         """同ゾーン内の近似通路距離。島に沿って歩くので L1 (マンハッタン) 基調。

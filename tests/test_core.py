@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from comiket_planner import load_layout, parse_placement, parse_placements, plan_route
+from comiket_planner.catalog import parse_line
 
 
 def test_parse_single():
@@ -62,3 +63,35 @@ def test_budget_drops_lowest():
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+# ラベル抽出は「場所の書き方だけを削る」。作品名の中の記号+数字を巻き込むと
+# 東方Project が「方Project」になる (実際に起きた)。web/js/catalog.js と同一挙動。
+def test_label_keeps_title_containing_place_words():
+    for line, want in [
+        ("西あ36 *2 東方Project", "東方Project"),
+        ("西あ36 *2 東京リベンジャーズ", "東京リベンジャーズ"),
+        ("西あ36 *3 西住みほ", "西住みほ"),
+        ("南q06 *3 南ことり", "南ことり"),
+        ("西あ36 *2 アイマス765プロ", "アイマス765プロ"),
+        ("西あ36 *2 壁は完売が早いので優先2", "壁は完売が早いので優先2"),
+    ]:
+        assert parse_line(line)[2] == want, line
+
+
+def test_label_strips_location_forms():
+    for line, want in [
+        ("西せ9-15 *3 範囲で書くと島ごと拾う", "範囲で書くと島ごと拾う"),
+        ("南q06,10,16 *4 番号の列挙もできる", "番号の列挙もできる"),
+        ("西地区 あ36 *1 メモ", "メモ"),
+        ("西あ36-39 東H07 まとめ書き", "まとめ書き"),
+        ("東H07 *2", ""),
+    ]:
+        assert parse_line(line)[2] == want, line
+
+
+def test_priority_marker_without_separator_and_fullwidth():
+    # *2ホロライブ のような続け書き、および全角入力(＊２ / あ３６)
+    assert parse_line("西あ36 *2ホロライブ")[1:] == (2, "ホロライブ")
+    assert parse_line("東Ｈ０７　＊２　ホロライブ")[1:] == (2, "ホロライブ")
+    assert parse_line("西あ３６ *2 ごちうさ")[1:] == (2, "ごちうさ")

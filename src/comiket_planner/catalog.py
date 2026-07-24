@@ -51,7 +51,10 @@ def _normalize(s: str) -> str:
     s = unicodedata.normalize("NFKC", s)
     s = s.replace("地区", "")
     s = re.sub(r"[（）\(\)]", " ", s)
-    s = re.sub(r"\*\s*[1-5]\b", " ", s)   # 優先度マーカー *1〜*5 を除去
+    # 優先度マーカー *1〜*5 を除去。境界は \b でなく「次が数字でないこと」。
+    # \b だと *2ホロライブ のような続け書き(かな漢字は単語文字)を取りこぼし、
+    # JS 版(\d を使えない)と挙動が割れる。
+    s = re.sub(r"\*\s*[1-5](?![0-9])", " ", s)
     return s
 
 
@@ -116,13 +119,20 @@ def parse_placement(text: str) -> list[Placement]:
     return out
 
 
-_PRIO_MARK = re.compile(r"\*\s*([1-5])\b")
+_PRIO_MARK = re.compile(r"\*\s*([1-5])(?![0-9])")
+
+# ラベル側から「場所の書き方」だけを削る。
+# 行頭か区切り(空白・読点)の直後にある塊しか削らないのが肝。無条件に削ると
+# 「東方Project」「西住みほ」「アイマス765プロ」のように、作品名の途中の
+# 記号+数字まで巻き込んで消してしまう (東→方Project など実害あり)。
+_BLK_CLS = re.escape(_HIRA + _KANA + _LAT_UP + _LAT_LO)
 _STRIP_TOKENS = re.compile(
-    r"[東西南](?:地区)?"
-    rf"|[{re.escape(_HIRA + _KANA + _LAT_UP + _LAT_LO)}]\s*\d{{1,3}}\s*[ab]?"
-    r"|\d{1,3}\s*[-〜~ー]\s*\d{1,3}"
-    r"|[,、，・]?\s*\d{1,3}\s*[ab]?"
-    r"|地区", re.I)
+    r"(^|[\s,、，・])"
+    rf"(?:[東西南]?\s*(?:地区)?\s*[{_BLK_CLS}]\s*\d{{1,3}}"
+    r"(?:\s*[-〜~ー]\s*\d{1,3}|\s*[ab])?"
+    r"|\d{1,3}\s*[-〜~ー]\s*\d{1,3})"
+    r"|[,、，・]\s*\d{1,3}\s*[ab]?"       # 列挙の続き (,10 ,16)
+    r"|[東西南]?地区", re.I)
 
 
 def parse_line(line: str) -> tuple[list[Placement], int, str]:
@@ -131,10 +141,13 @@ def parse_line(line: str) -> tuple[list[Placement], int, str]:
     優先度は `*1`〜`*5`(無ければ3)。ラベルは記号/番号/区名を取り除いた残り。
     """
     placements = parse_placement(line)
-    pm = _PRIO_MARK.search(line)
+    # 配置側は _normalize 済みの文字列を見ているので、ラベル側も NFKC を通す。
+    # そうしないと全角(＊２ / あ３６)が優先度にもラベル除去にも引っかからない。
+    norm = unicodedata.normalize("NFKC", line)
+    pm = _PRIO_MARK.search(norm)
     priority = int(pm.group(1)) if pm else 3
-    label = _PRIO_MARK.sub(" ", line)
-    label = _STRIP_TOKENS.sub(" ", label)
+    label = _PRIO_MARK.sub(" ", norm)
+    label = _STRIP_TOKENS.sub(r"\1 ", label)
     label = re.sub(r"\s+", " ", label).strip(" 　,、，・")
     for p in placements:
         p.priority = priority

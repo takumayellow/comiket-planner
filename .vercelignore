@@ -1,0 +1,6 @@
+# 保険。デプロイは web/ を cwd にして行う想定だが、リポジトリ直下で
+# うっかり `vercel` を叩いても個人データ (.local/) と公式配布物
+# (data/official/ の折込地図PDF) を絶対に上げないようにする。
+# docs/data-sources.md を参照。
+/*
+!/web

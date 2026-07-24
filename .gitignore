@@ -25,3 +25,6 @@ build/
 Thumbs.db
 .idea/
 .vscode/
+
+# Web 版のローカル検証用 (スクショ撮影のiframeラッパ)
+web/_dbg.html

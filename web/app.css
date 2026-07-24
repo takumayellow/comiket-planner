@@ -1,0 +1,420 @@
+/* コミケカタログ/会場地図の質感: 黒×赤、太ゴシック、直線、高い情報密度。
+   会場は照明が暗く画面も見づらいので、コントラストを強めに振ってある。 */
+
+:root {
+  --ink: #0b0b0d;
+  --ink2: #141417;
+  --ink3: #1c1c21;
+  --line: #2e2e36;
+  --line2: #3d3d47;
+  --paper: #f4f1ea;
+  --dim: #9d978c;
+  --dim2: #6e6a63;
+  --red: #e60012;
+  --red-dk: #9d000c;
+  --amber: #e8a317;
+  --blue: #4a90d9;
+  --green: #35a05e;
+  --gothic: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic",
+    YuGothic, "Noto Sans JP", Meiryo, system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  overflow-x: hidden; /* 何かが溢れても横スクロールは出さない (会場で片手操作するため) */
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--gothic);
+  font-size: 15px;
+  line-height: 1.55;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ---------- 見出し帯 ---------- */
+
+.masthead {
+  border-bottom: 3px solid var(--red);
+  background: var(--ink2);
+}
+
+.masthead__stripe {
+  height: 7px;
+  background: repeating-linear-gradient(-45deg,
+    var(--red) 0 11px, var(--ink) 11px 22px);
+}
+
+.masthead__body {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 11px 14px 10px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.masthead h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+}
+
+.masthead h1 em {
+  font-style: normal;
+  color: var(--red);
+}
+
+.masthead .tag {
+  font-size: 11px;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+.masthead__meta {
+  margin-left: auto;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--dim2);
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  min-width: 0;
+}
+
+/* ---------- レイアウト ---------- */
+
+main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 12px 96px;
+}
+
+@media (min-width: 900px) {
+  main {
+    display: grid;
+    grid-template-columns: 372px 1fr;
+    gap: 22px;
+    align-items: start;
+    padding-bottom: 40px;
+  }
+  .col-out { min-width: 0; }
+}
+
+section { margin-top: 18px; }
+
+h2 {
+  margin: 0 0 9px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: var(--paper);
+  border-left: 5px solid var(--red);
+  padding-left: 8px;
+  line-height: 1.35;
+}
+
+h2 span { color: var(--dim2); font-weight: 400; letter-spacing: 0.04em; }
+
+.hint { font-size: 11.5px; color: var(--dim2); margin: 6px 2px 0; line-height: 1.5; }
+
+/* ---------- 入力 ---------- */
+
+.panel { background: var(--ink2); border: 1px solid var(--line); }
+
+textarea {
+  width: 100%;
+  min-height: 168px;
+  background: var(--ink3);
+  color: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 10px;
+  font-size: 14px;
+  font-family: var(--gothic);
+  line-height: 1.7;
+  resize: vertical;
+}
+
+textarea:focus, input:focus, select:focus {
+  outline: 2px solid var(--red);
+  outline-offset: -2px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 9px;
+  margin-top: 11px;
+}
+
+label.f { display: block; font-size: 10.5px; color: var(--dim); letter-spacing: 0.1em; }
+
+input, select {
+  width: 100%;
+  margin-top: 3px;
+  background: var(--ink3);
+  color: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 8px 7px;
+  font-size: 14px;
+  font-family: var(--gothic);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.check input { width: 19px; height: 19px; margin: 0; accent-color: var(--red); }
+
+button {
+  font-family: var(--gothic);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.btn-go {
+  width: 100%;
+  margin-top: 13px;
+  padding: 14px;
+  background: var(--red);
+  color: #fff;
+  font-size: 15px;
+}
+
+.btn-go:active { background: var(--red-dk); }
+
+.btn-sub {
+  background: var(--ink3);
+  color: var(--dim);
+  border: 1px solid var(--line);
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+.samples { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+.samples button {
+  background: transparent;
+  border: 1px solid var(--line2);
+  color: var(--dim);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  padding: 4px 8px;
+}
+
+/* ---------- サマリー ---------- */
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--line);
+  background: var(--ink2);
+}
+
+.summary div { padding: 9px 4px 10px; text-align: center; border-left: 1px solid var(--line); }
+.summary div:first-child { border-left: 0; }
+.summary b { display: block; font-size: 21px; font-weight: 900; line-height: 1.1; }
+.summary small { font-size: 10px; color: var(--dim2); letter-spacing: 0.08em; }
+.summary .accent b { color: var(--red); }
+
+.progress { height: 5px; background: var(--ink3); border: 1px solid var(--line); border-top: 0; }
+.progress i { display: block; height: 100%; background: var(--green); width: 0; transition: width .18s; }
+
+/* ---------- 地図 ---------- */
+
+.mapwrap {
+  border: 1px solid var(--line);
+  background: var(--ink);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mapwrap svg { display: block; width: 100%; height: auto; min-width: 320px; }
+.mapwrap.zoom svg { width: 200%; }
+
+.legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 7px;
+  align-items: center;
+}
+
+.legend i {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
+/* 優先度の色。CSP(style-src 'self') で style="" 属性が効かないので、
+   色は必ずクラスで当てる。JS 側 stopColor() と対応させること。 */
+.p12 { background: var(--red); }
+.p3 { background: var(--amber); }
+.p45 { background: var(--blue); }
+.legend i.wallmark { background: #555; box-shadow: inset 0 0 0 2px var(--paper); }
+
+/* ---------- 巡回順 ---------- */
+
+.stop {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-top: 0;
+  background: var(--ink2);
+}
+
+.stop:first-of-type { border-top: 1px solid var(--line); }
+.stop.done { opacity: 0.42; }
+
+.stop__no {
+  flex: 0 0 30px;
+  background: var(--ink3);
+  color: var(--dim);
+  font-size: 13px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--line);
+}
+
+.stop__sym {
+  flex: 0 0 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  padding: 6px 2px;
+}
+
+.stop__sym b { font-size: 25px; font-weight: 900; line-height: 1; letter-spacing: 0; }
+.stop__sym s { font-size: 9.5px; text-decoration: none; opacity: .85; letter-spacing: .04em; }
+.stop__sym.wall { box-shadow: inset 0 0 0 3px var(--paper); }
+
+.stop__main { flex: 1 1 auto; min-width: 0; padding: 7px 9px; }
+
+.stop__loc { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+.stop__loc u { text-decoration: none; color: var(--dim); font-weight: 400; font-size: 12px; }
+.stop__lab {
+  font-size: 12.5px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stop__time {
+  flex: 0 0 68px;
+  text-align: right;
+  padding: 7px 8px;
+  border-left: 1px dashed var(--line);
+  white-space: nowrap;
+}
+
+.stop__time b { display: block; font-size: 16px; font-weight: 900; line-height: 1.2; }
+.stop__time small { font-size: 9.5px; color: var(--dim2); }
+
+.stop__chk {
+  flex: 0 0 40px;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: #5b5b66;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stop.done .stop__chk { color: var(--green); }
+
+.pill {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0 5px;
+  margin-left: 5px;
+  color: var(--ink);
+  vertical-align: 1px;
+}
+
+/* ---------- 注意/繰り越し ---------- */
+
+.notice {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--amber);
+  background: var(--ink2);
+  padding: 9px 11px;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+.notice.bad { border-left-color: var(--red); }
+.notice b { color: var(--paper); }
+.notice ul { margin: 5px 0 0; padding-left: 18px; }
+
+.empty {
+  border: 1px dashed var(--line2);
+  padding: 26px 14px;
+  text-align: center;
+  color: var(--dim2);
+  font-size: 12.5px;
+}
+
+/* ---------- フッタ ---------- */
+
+footer {
+  margin-top: 30px;
+  border-top: 1px solid var(--line);
+  padding: 14px 2px 0;
+  font-size: 11px;
+  color: var(--dim2);
+  line-height: 1.7;
+}
+
+footer a { color: var(--dim); }
+
+.grid-full { grid-column: 1 / -1; }
+
+/* ---------- インストール案内 ---------- */
+
+.install {
+  display: none;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--red);
+  background: rgba(230, 0, 18, .09);
+  padding: 9px 11px;
+  font-size: 12px;
+  margin-top: 14px;
+}
+
+.install.on { display: flex; }
+.install button { margin-left: auto; background: var(--red); color: #fff; padding: 7px 12px; font-size: 12px; }

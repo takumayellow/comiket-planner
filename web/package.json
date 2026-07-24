@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "type": "module",
+  "name": "comiket-planner-web",
+  "description": "静的PWA。Vercelにはデプロイしない(.vercelignore)。ローカルでESMとして読むためだけのファイル。"
+}

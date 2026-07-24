@@ -209,13 +209,16 @@ function readRow(e) {
       : e.cue ? `優先度は「${esc(e.cue)}」から推定` : '手がかりが無いので優先度は既定';
   // サークル名は文面から拾えないことのほうが多い。ここで書き足せると、
   // 巡回順・コピーしたテキストにそのまま出て「どこの何なのか」が分かる。
+  // 読み上げでは同じ名前の欄が件数ぶん並ぶことになるので、場所を名前に含める
+  const where = esc(`${hall} ${p.block}${nums}`);
   return `<div class="rd">
     <span class="rd__loc ${col}">${esc(hall)} ${esc(p.block)}${esc(nums)}</span>
     <input class="rd__name" type="text" data-k="${esc(e.key)}"
       value="${esc(e.label || '')}" placeholder="サークル名・目印（任意）"
-      aria-label="サークル名">
+      aria-label="${where} のサークル名">
     <span class="rd__cue">${cue}</span>
-    <select class="rd__sel" data-k="${esc(e.key)}" aria-label="優先度">${opts}</select>
+    <select class="rd__sel" data-k="${esc(e.key)}"
+      aria-label="${where} の優先度">${opts}</select>
   </div>`;
 }
 
@@ -321,6 +324,11 @@ function render(unparsed = state.unparsed) {
 
   $('#stops').innerHTML = plan.stops.map((s, i) => stopRow(s, i)).join('');
   bindStops();
+
+  // 押した結果が画面のずっと下に出るので、読み上げ環境には要点だけ知らせる
+  // (結果の全文を読み上げると長すぎる。件数と時間が分かれば下へ辿れる)
+  $('#planLive').textContent = `巡回順を組みました。${plan.stops.length}件、`
+    + `所要 ${pyRound(plan.totalMin)}分、終了めやす ${hhmm(endMin)}。`;
   syncProgress();
 
   const extra = [];
@@ -345,7 +353,7 @@ function stopRow(s, i) {
   const nums = formatNumbers(items.map((x) => x.number));
   const hall = layout.hallOf(p.block, p.number) || p.district || '';
   const col = priorityClass(p.priority);   // 色は CSS クラスで当てる (CSP対応)
-  const done = state.done.has(p.groupKey) ? ' done' : '';
+  const done = state.done.has(p.groupKey);
   const labels = [...new Set(items.map((x) => x.label).filter(Boolean))];
   // 名前が無いと当日「ここは何だったか」が分からない。書いてあれば太く出し、
   // 無ければ調べに行く導線を出す (押しても消し込みは動かない)。
@@ -354,7 +362,7 @@ function stopRow(s, i) {
     : `<div class="stop__lab none">名前は未記入</div>
        <a class="stop__find" href="${esc(findUrl(p, nums))}"
          target="_blank" rel="noopener noreferrer">調べる（要通信）</a>`;
-  return `<div class="stop${done}" data-k="${esc(p.groupKey)}">
+  return `<div class="stop${done ? ' done' : ''}" data-k="${esc(p.groupKey)}">
     <div class="stop__no">${i + 1}</div>
     <div class="stop__sym ${col}${s.wall ? ' wall' : ''}">
       <b>${esc(p.block)}</b><s>${items.length}件</s></div>
@@ -366,20 +374,32 @@ function stopRow(s, i) {
     </div>
     <div class="stop__time"><b>${s.arrival}</b>
       <small>${s.walkFromPrev >= 0.5 ? `移動+${Math.round(s.walkFromPrev)}分` : '—'}</small></div>
-    <div class="stop__chk">✓</div>
+    <button class="stop__chk" type="button" role="checkbox"
+      aria-checked="${done ? 'true' : 'false'}"
+      aria-label="${esc(`${hall} ${p.block}${nums}`)} を回り終えた"><span
+      aria-hidden="true">✓</span></button>
   </div>`;
 }
 
 function bindStops() {
   for (const el of document.querySelectorAll('.stop')) {
-    el.addEventListener('click', (ev) => {
-      // 「名前を調べる」を押しただけで消し込まれると、戻ってきたとき混乱する
-      if (ev.target.closest('.stop__find')) return;
+    const chk = el.querySelector('.stop__chk');
+    // 消し込みの実体はここの button。行のどこを押しても効くのは指で操作する
+    // ときの都合で、キーボードと読み上げは button だけを辿ればいいようにする。
+    const toggle = () => {
       const k = el.dataset.k;
-      if (state.done.has(k)) state.done.delete(k); else state.done.add(k);
-      el.classList.toggle('done');
+      const on = !state.done.has(k);
+      if (on) state.done.add(k); else state.done.delete(k);
+      el.classList.toggle('done', on);
+      chk.setAttribute('aria-checked', on ? 'true' : 'false');
       saveDone();
       syncProgress();
+    };
+    chk.addEventListener('click', (ev) => { ev.stopPropagation(); toggle(); });
+    el.addEventListener('click', (ev) => {
+      // 「調べる」を押しただけで消し込まれると、戻ってきたとき混乱する
+      if (ev.target.closest('.stop__find') || ev.target.closest('.stop__chk')) return;
+      toggle();
     });
   }
 }

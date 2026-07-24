@@ -14,14 +14,16 @@
   --sky-1: #eaf6fd;
   --sky-2: #d6ecfa;
   --sky-3: #a9daf3;
-  --aqua: #2e9fd8;   /* 主色 */
-  --aqua-d: #1a76a8; /* 主色の文字用 (白地に 4.9:1) */
+  --aqua: #2e9fd8;   /* 主色。面にだけ使う。この上に白い文字は置かない (2.97:1) */
+  --aqua-d: #1a76a8; /* 白い文字を載せられる下地 / 白地の文字 (どちらも 5.0:1) */
+  --aqua-dd: #14608a;/* 上の色をさらに沈めたもの。面の階調を作るのに使う (6.8:1) */
   --aqua-x: #0f4f74; /* 見出し */
   --ink: #16344a;    /* 本文 */
   --ink2: #42627a;   /* 副次テキスト (白地に 6.6:1) */
-  --ink3: #5c7c93;   /* 三次テキスト (白地に 4.6:1)。これ以上薄くしない */
+  --ink3: #4f6d83;   /* 三次テキスト (白地に 5.4:1)。これ以上薄くしない */
   --line: #dceefa;   /* 罫 */
-  --line2: #b7d9ec;  /* 濃い罫 */
+  --line2: #b7d9ec;  /* 罫。文字や記号には薄すぎる (白地に 1.5:1) ので使わない */
+  --mark: #6f97ae;   /* 罫より濃い記号用 (白地に 3.1:1)。チェック前の✓など */
   --card: #ffffff;
   --rose: #d6385c;   /* 差し色。最優先と警告にだけ使う */
   --rose-d: #b32748;
@@ -52,6 +54,19 @@ body {
 }
 
 b.warn { color: var(--rose-d); }
+
+/* 読み上げにだけ渡す文字。display:none だと読まれないので画面外へ逃がす */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 .br-sp { display: none; }
 @media (min-width: 720px) { .br-sp { display: inline; } }
@@ -240,14 +255,15 @@ h2 {
   line-height: 1.35;
 }
 
-/* 節の頭の英字ラベル。日本語見出しの上に小さく置いて情報の階層を作る */
+/* 節の頭の英字ラベル。日本語見出しの上に小さく置いて情報の階層を作る。
+   小さい字なので色は --aqua ではなく --aqua-d (白地に 5.0:1) を使う */
 .eyebrow {
   display: block;
   margin-bottom: 5px;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
   letter-spacing: 0.26em;
-  color: var(--aqua);
+  color: var(--aqua-d);
 }
 
 .eyebrow::after {
@@ -290,12 +306,24 @@ textarea {
   transition: border-color .15s, box-shadow .15s;
 }
 
-textarea::placeholder { color: #8fabbe; }
+/* 何を書く欄なのか placeholder でしか分からないので、薄くしすぎない (4.5:1) */
+textarea::placeholder { color: #56768c; }
 
 textarea:focus, input:focus, select:focus {
   outline: 0;
-  border-color: var(--aqua);
+  border-color: var(--aqua-d);
   box-shadow: 0 0 0 4px rgba(46, 159, 216, .18);
+}
+
+/* キーボードで辿っているときは、どこに居るかを必ず線で示す。淡い影だけだと
+   屋外の直射日光でまず見えない。ボタン類は既定の輪郭に任せず自前で描く。 */
+:focus-visible {
+  outline: 3px solid var(--aqua-d);
+  outline-offset: 2px;
+}
+
+textarea:focus-visible, input:focus-visible, select:focus-visible {
+  outline-offset: 1px;
 }
 
 .fields {
@@ -346,22 +374,35 @@ button {
   transition: transform .12s, box-shadow .15s, background .15s, color .15s;
 }
 
+/* 明るい水色の上に白い文字を置くと 2.97:1 しか出ない (18px 太字は 4.5:1 が要る)。
+   面のほうを沈めて階調を作り、明るさは上端のハイライト1本で出す。 */
 .btn-go {
   width: 100%;
   margin-top: 18px;
   padding: 17px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #38aee2 0%, var(--aqua) 46%, var(--aqua-d) 100%);
+  background: linear-gradient(135deg, var(--aqua-d) 0%, #17699a 55%, var(--aqua-dd) 100%);
   color: #fff;
   font-size: 18px;
   letter-spacing: 0.12em;
-  box-shadow: 0 14px 28px -14px rgba(26, 118, 168, .95);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34),
+    0 14px 28px -14px rgba(26, 118, 168, .95);
 }
 
-.btn-go:hover { transform: translateY(-1px); box-shadow: 0 18px 34px -14px rgba(26, 118, 168, .95); }
-.btn-go:active { transform: translateY(1px); box-shadow: 0 8px 18px -12px rgba(26, 118, 168, .95); }
+.btn-go:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34),
+    0 18px 34px -14px rgba(26, 118, 168, .95);
+}
+
+.btn-go:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34),
+    0 8px 18px -12px rgba(26, 118, 168, .95);
+}
 
 .btn-sub {
+  min-height: 44px;   /* 片手・屋外で押すので 44px を下回らせない */
   background: var(--card);
   color: var(--aqua-x);
   border: 1.5px solid var(--line2);
@@ -379,6 +420,7 @@ button {
 .samples { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
 .samples button {
+  min-height: 40px;
   background: var(--sky-1);
   color: var(--ink2);
   font-size: 13px;
@@ -532,6 +574,7 @@ button {
   grid-row: 2;
   grid-column: 1 / -1;
   width: 100%;
+  min-height: 44px;   /* 行が件数ぶん縦に並ぶので、狭いと隣を押してしまう */
   margin: 0;
   padding: 7px 10px;
   font-size: 14px;
@@ -541,7 +584,7 @@ button {
 }
 
 .rd__name:focus { background: #fff; }
-.rd__name::placeholder { color: #90adc0; }
+.rd__name::placeholder { color: #56768c; }
 
 .rd__cue { grid-row: 3; grid-column: 1 / -1; font-size: 11.5px; color: var(--ink3); }
 
@@ -549,6 +592,7 @@ button {
   grid-row: 1;
   grid-column: 3;
   width: auto;
+  min-height: 44px;
   margin: 0;
   padding: 8px 7px;
   font-size: 14px;
@@ -595,13 +639,16 @@ button {
 
 .summary small { display: block; margin-top: 5px; font-size: 11.5px; color: var(--ink3); letter-spacing: 0.08em; }
 
+/* 白い文字を載せる面なので、明るい水色ではなく沈めた側の階調で作る */
 .summary .accent {
-  background: linear-gradient(150deg, var(--aqua) 0%, var(--aqua-d) 100%);
+  background: linear-gradient(150deg, var(--aqua-d) 0%, var(--aqua-dd) 100%);
   border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3);
 }
 
 .summary .accent b { color: #fff; }
-.summary .accent small { color: rgba(255, 255, 255, .85); }
+/* 11.5px の小さい字。透かすと 4.5:1 を割るので不透明な淡色を置く */
+.summary .accent small { color: var(--sky-1); }
 
 @media (max-width: 520px) {
   .summary { grid-template-columns: repeat(2, 1fr); }
@@ -661,9 +708,11 @@ button {
    色は必ずクラスで当てる。JS 側 stopColor() と対応させること。
    塗りが欲しいのは凡例の丸と巡回順の記号だけ。無条件に .p12 へ background を
    当てると、同じクラスを文字色に使う .rd__loc が地と同色に潰れる。 */
-.legend i.p12, .stop__sym.p12 { background: linear-gradient(160deg, #e6546f, var(--rose)); }
-.legend i.p3, .stop__sym.p3 { background: linear-gradient(160deg, #45aee0, var(--aqua-d)); }
-.legend i.p45, .stop__sym.p45 { background: linear-gradient(160deg, #7695a9, var(--ink2)); }
+/* 優先度の色。巡回順では白いブロック記号と件数を載せる面なので、階調の
+   明るい側も 4.5:1 を割らない色に留める (明るくすると 11px の件数が読めない) */
+.legend i.p12, .stop__sym.p12 { background: linear-gradient(160deg, var(--rose), var(--rose-d)); }
+.legend i.p3, .stop__sym.p3 { background: linear-gradient(160deg, var(--aqua-d), var(--aqua-dd)); }
+.legend i.p45, .stop__sym.p45 { background: linear-gradient(160deg, #55758c, var(--ink2)); }
 .legend i.wallmark { background: var(--card); box-shadow: inset 0 0 0 2px var(--aqua-x); }
 
 /* ---------- 巡回順 ---------- */
@@ -682,7 +731,10 @@ button {
 
 .stop:first-of-type { margin-top: 0; }
 .stop:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
-.stop.done { opacity: 0.44; }
+/* 回り終えた行。薄くしすぎると屋外で読めなくなる (0.44 だと本文が 4.5:1 を割る)
+   ので、薄さは 0.75 までにして、状態は取り消し線と✓の色でも示す。 */
+.stop.done { opacity: 0.75; }
+.stop.done .stop__loc { text-decoration: line-through; }
 
 .stop__no {
   flex: 0 0 34px;
@@ -706,7 +758,7 @@ button {
 }
 
 .stop__sym b { font-size: 31px; font-weight: 900; line-height: 1; letter-spacing: 0; }
-.stop__sym s { font-size: 11px; text-decoration: none; opacity: .9; letter-spacing: .04em; }
+.stop__sym s { font-size: 11px; text-decoration: none; letter-spacing: .04em; }
 .stop__sym.wall { box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .85); }
 
 .stop__main { flex: 1 1 auto; min-width: 0; padding: 11px 13px; }
@@ -757,18 +809,26 @@ button {
 .stop__time b { display: block; font-size: 20px; font-weight: 900; line-height: 1.2; color: var(--aqua-x); }
 .stop__time small { font-size: 11.5px; color: var(--ink3); }
 
+/* 消し込みは行のどこを押しても効くが、キーボードと読み上げのために実体は
+   ここの button に持たせる。✓ の色は罫の色だと 1.5:1 しか出ないので使わない。 */
 .stop__chk {
   flex: 0 0 46px;
+  align-self: stretch;
+  padding: 0;
+  border: 0;
   border-left: 1px solid var(--line);
+  border-radius: 0;
   background: transparent;
-  color: var(--line2);
+  color: var(--mark);
+  font-family: inherit;
   font-size: 24px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.stop.done .stop__chk { color: var(--aqua); }
+.stop.done .stop__chk { color: var(--aqua-d); }
 
 /* 狭い画面では左右の固定カラムを詰めて、サークル名/メモの幅を確保する。
    文字サイズは落とさない (会場で読めなくなる) */
@@ -852,14 +912,15 @@ button {
 .install button {
   margin-left: auto;
   flex: 0 0 auto;
-  background: var(--aqua);
+  min-height: 44px;
+  background: var(--aqua-d);   /* 白い文字を載せるので明るい水色は使えない */
   color: #fff;
   padding: 10px 18px;
   font-size: 14px;
   border-radius: 999px;
 }
 
-.install button:hover { background: var(--aqua-d); }
+.install button:hover { background: var(--aqua-dd); }
 
 /* ---------- フッタ ---------- */
 /* main のグリッドの中に置くと、貼り付く左カラムや最後のボタンと重なる事故が起きる。

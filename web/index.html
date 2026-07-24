@@ -46,12 +46,16 @@
 
       <div class="fields">
         <div>
-          <label class="f" for="start">入場・行動開始</label>
+          <label class="f" for="start">回りはじめる</label>
           <input id="start" type="time" value="11:20">
         </div>
         <div>
-          <label class="f" for="budget">使える時間(分)</label>
-          <input id="budget" type="number" min="30" step="10" placeholder="制限なし">
+          <label class="f" for="end">帰る時刻</label>
+          <input id="end" type="time" placeholder="指定なし">
+        </div>
+        <div>
+          <label class="f" for="brk">昼食・休憩(分)</label>
+          <input id="brk" type="number" min="0" max="180" step="5" placeholder="0">
         </div>
         <div>
           <label class="f" for="zone">最初に居るホール</label>
@@ -64,6 +68,8 @@
           </select>
         </div>
       </div>
+
+      <p class="hint" id="budgetNote"></p>
 
       <label class="check">
         <input id="grp" type="checkbox" checked>
@@ -84,6 +90,7 @@
       <h2>結果</h2>
       <div class="summary" id="summary"></div>
       <div class="progress"><i id="pbar"></i></div>
+      <p class="hint" id="slack"></p>
     </section>
 
     <section id="mapsec" hidden>

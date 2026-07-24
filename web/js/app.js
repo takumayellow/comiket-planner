@@ -5,7 +5,7 @@ import { LAYOUT_DOC } from './layout-data.js';
 import { Layout } from './layout.js';
 import { parseText } from './catalog.js';
 import { groupByBlock, noGrouping, formatNumbers } from './group.js';
-import { planRoute, pyRound } from './router.js';
+import { planRoute, pyRound, hhmmToMin, minToHhmm } from './router.js';
 import { renderMap, priorityClass } from './map.js';
 
 const $ = (s) => document.querySelector(s);
@@ -35,7 +35,8 @@ function save() {
   ls(() => {
     localStorage.setItem(`${LS}text`, $('#text').value);
     localStorage.setItem(`${LS}start`, $('#start').value);
-    localStorage.setItem(`${LS}budget`, $('#budget').value);
+    localStorage.setItem(`${LS}end`, $('#end').value);
+    localStorage.setItem(`${LS}brk`, $('#brk').value);
     localStorage.setItem(`${LS}zone`, $('#zone').value);
     localStorage.setItem(`${LS}grp`, $('#grp').checked ? '1' : '0');
   });
@@ -49,12 +50,52 @@ function restore() {
   const get = (k, d = null) => ls(() => localStorage.getItem(`${LS}${k}`), d);
   $('#text').value = get('text') ?? SAMPLE;
   $('#start').value = get('start') || '11:20';
-  $('#budget').value = get('budget') ?? '';
+  $('#brk').value = get('brk') ?? '';
+  // 旧版は「使える時間(分)」で保存していた。帰る時刻に読み替えて引き継ぐ
+  const oldBudget = parseInt(get('budget') ?? '', 10);
+  $('#end').value = get('end')
+    ?? (Number.isFinite(oldBudget)
+      ? minToHhmm(hhmmToMin($('#start').value) + oldBudget) : '');
   $('#zone').value = get('zone') ?? '';
   const g = get('grp');
   $('#grp').checked = g === null ? true : g === '1';
   state.done = ls(() => new Set(JSON.parse(get('done') || '[]')), new Set())
     || new Set();
+}
+
+// ---------- 使える時間 ----------
+// 「何分使えるか」を人が数えるのは面倒なので、帰る時刻から逆算する。
+// 昼食・休憩はここで先に取り分けておく (巡回の途中でどこで食べるかは決めない)。
+
+function budgetInfo() {
+  const startMin = hhmmToMin($('#start').value || '11:20');
+  const endRaw = $('#end').value;
+  const brk = Math.max(0, parseInt($('#brk').value, 10) || 0);
+  if (!endRaw) return { budget: null, startMin, brk, endMin: null, bad: false };
+
+  let endMin = hhmmToMin(endRaw);
+  // 日をまたぐ入力 (23:00 → 01:00) は誤入力とみなさず素直に翌日として扱う
+  if (endMin <= startMin) endMin += 24 * 60;
+  const budget = endMin - startMin - brk;
+  return { budget: budget > 0 ? budget : null, startMin, brk, endMin,
+    bad: budget <= 0 };
+}
+
+function renderBudgetNote() {
+  const b = budgetInfo();
+  const el = $('#budgetNote');
+  if (b.bad) {
+    el.innerHTML = '<b class="warn">休憩が長すぎて回る時間が残りません。</b>'
+      + '帰る時刻か休憩の分数を見直してください。';
+    return;
+  }
+  if (b.budget === null) {
+    el.textContent = '帰る時刻を入れると、そこに収まるところまでで切り上げた巡回順を組みます。';
+    return;
+  }
+  el.textContent = `${$('#start').value} → ${$('#end').value} のうち`
+    + (b.brk ? `昼食・休憩 ${b.brk}分 を取り分けた` : '')
+    + ` ${b.budget}分 で回ります。入りきらない分は「時間内に入らず外した」に出します。`;
 }
 
 // ---------- 計算 ----------
@@ -72,12 +113,12 @@ function compute() {
 
   const { reps, groups } = $('#grp').checked
     ? groupByBlock(placements) : noGrouping(placements);
-  const budget = $('#budget').value ? parseInt($('#budget').value, 10) : null;
+  const b = budgetInfo();
 
   const plan = planRoute(reps, layout, {
     startZone: $('#zone').value || null,
     startTime: $('#start').value || '11:20',
-    timeBudgetMin: Number.isFinite(budget) ? budget : null,
+    timeBudgetMin: b.budget,
   });
   for (const s of plan.stops) s.wall = layout.isWall(s.placement.block);
 
@@ -105,14 +146,30 @@ function render(unparsed = state.unparsed) {
   }
 
   // 時刻の丸めは Python 実装(pyRound)に合わせる。Math.round だと最終到着時刻と
-  // 終了めやすが1分ずれることがある
-  const endMin = plan.startMin + pyRound(plan.totalMin);
+  // 終了めやすが1分ずれることがある。休憩は巡回に含まれないので終了に足す
+  const b = budgetInfo();
+  const endMin = plan.startMin + pyRound(plan.totalMin) + b.brk;
   const walkTotal = plan.stops.reduce((a, s) => a + s.walkFromPrev, 0);
   $('#summary').innerHTML = `
     <div class="accent"><b>${plan.stops.length}</b><small>立ち寄り</small></div>
     <div><b>${pyRound(plan.totalMin)}</b><small>所要(分)</small></div>
     <div><b>${hhmm(endMin)}</b><small>終了めやす</small></div>
     <div><b>${pyRound(walkTotal)}</b><small>うち移動(分)</small></div>`;
+
+  // 帰る時刻に対してどれだけ余っているか (立ち止まって迷える時間)
+  const slack = b.endMin === null ? null : b.endMin - endMin;
+  const leave = b.endMin === null ? '' : `帰る <b>${minToHhmm(b.endMin)}</b>`
+    + `${b.brk ? `（昼食・休憩 ${b.brk}分 を含む）` : ''}`;
+  if (slack === null) {
+    $('#slack').textContent = '帰る時刻を入れると、そこに収まるところまでで切り上げます。';
+  } else if (slack < 0) {
+    // 休憩が長すぎて回る時間が残らなかったとき。時間制限なしの巡回順を出している
+    $('#slack').innerHTML = `${leave} を <b class="warn">${-slack}分 超えます。</b>`
+      + '休憩の分数を減らすか、帰る時刻を遅くしてください。';
+  } else {
+    $('#slack').innerHTML = `${leave} に対して余裕 <b>${slack}分</b>。`
+      + (slack < 15 ? '<b class="warn">ほぼ余裕がありません。</b>' : '');
+  }
 
   // 地図が描けなくても巡回順は出す (会場データにゾーンが増えたときの保険)
   try {
@@ -219,13 +276,18 @@ function esc(s) {
 // ---------- 起動 ----------
 
 restore();
+renderBudgetNote();
 $('#meta').innerHTML = `${esc(LAYOUT_DOC.event || '')}<br>${esc(LAYOUT_DOC.venue || '')}`;
 if ($('#text').value.trim()) compute();
 
 $('#go').addEventListener('click', compute);
 $('#text').addEventListener('change', save);
-for (const id of ['#start', '#budget', '#zone', '#grp']) {
-  $(id).addEventListener('change', () => { save(); if (state.plan) compute(); });
+for (const id of ['#start', '#end', '#brk', '#zone', '#grp']) {
+  $(id).addEventListener('change', () => {
+    renderBudgetNote();
+    save();
+    if (state.plan) compute();
+  });
 }
 for (const b of document.querySelectorAll('[data-fill]')) {
   b.addEventListener('click', () => {

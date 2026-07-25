@@ -742,11 +742,13 @@ button {
   border-radius: 12px;
   background: var(--card);
   overflow: auto;
+  max-height: min(72vh, 640px);
   -webkit-overflow-scrolling: touch;
 }
 
-.mapwrap svg { display: block; width: 100%; height: auto; min-width: 320px; }
-.mapwrap.zoom svg { width: 200%; }
+/* 図は実寸(px)で描き、収まらない分は横スクロールで見せる。会場は横長なので
+   画面幅に縮めると記号が潰れる。拡大ボタンより素直な指スクロールに任せる。 */
+.mapwrap svg { display: block; height: auto; max-width: none; }
 
 .legend {
   display: flex;

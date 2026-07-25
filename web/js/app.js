@@ -129,9 +129,7 @@ function renderBudgetNote() {
   if (b.cappedStart) {
     fix.push(`開会は <b>${OPEN}</b> なので、そこから回りはじめる前提で計算します。`);
   }
-  if (b.cappedEnd) {
-    fix.push(`サークルの頒布は <b>${CLOSE}</b> で終わります。それより後は指定できません。`);
-  }
+  // 16:00 より後は入力欄側 (max) で選べないようにしてあるので、文では触れない。
   if (b.inverted) {
     fix.push('<b class="warn">帰る時刻が回りはじめより前です。</b>');
   }
@@ -459,6 +457,11 @@ renderBudgetNote();
 $('#meta').textContent = LAYOUT_DOC.event || 'コミックマーケット';
 $('#venue').textContent = LAYOUT_DOC.venue || '東京ビッグサイト';
 $('#hours').textContent = `${OPEN} — ${CLOSE}`;
+// 開会前・閉会後は選べないようにする (文で断らず入力欄側で止める)
+for (const id of ['#start', '#end']) {
+  $(id).min = OPEN;
+  $(id).max = CLOSE;
+}
 if ($('#text').value.trim()) compute();
 
 $('#go').addEventListener('click', compute);
@@ -496,10 +499,6 @@ $('#copyBtn').addEventListener('click', async () => {
   } catch {
     $('#copyBtn').textContent = 'コピーできませんでした';
   }
-});
-$('#zoomBtn').addEventListener('click', () => {
-  const on = $('#mapwrap').classList.toggle('zoom');
-  $('#zoomBtn').textContent = on ? '縮小' : '拡大';
 });
 
 // 音声入力 (対応ブラウザのみ)。喋った分は末尾に足していくだけで、

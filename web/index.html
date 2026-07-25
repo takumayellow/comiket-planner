@@ -83,10 +83,8 @@
         <button type="button" data-fill="clear">全部消す</button>
       </div>
       <p class="hint">
-        文章の中から <b>地区（東・西・南）＋ブロック記号＋番号</b> を探して、1件ずつに切り分けます。
-        <b>あ36-39</b> のような範囲や <b>あ36,38,39</b> のような並びは、まとめて1件として読みます。
-        優先度は<b>「絶対」「本命」「できれば」「ついでに」</b>といった言い回しから推し量ります。
-        自分で決めたいときは <b>*1〜*5</b> と書けば、そちらを優先します。
+        文中から場所を読み取って配置を整理します。言い回しから優先度も推し量ります。
+        自分で決めたいときは <b>*1〜*5</b> と書けます。
       </p>
 
       <div class="read" id="read" hidden>
@@ -151,16 +149,14 @@
     </section>
 
     <section class="card card--teal" id="mapsec" hidden>
-      <h2><span class="eyebrow">MAP</span>会場の概略図<span class="sub">自前の座標モデル</span></h2>
+      <h2><span class="eyebrow">MAP</span>会場の概略図<span class="sub">番号は立ち寄り順</span></h2>
       <div class="mapwrap" id="mapwrap"></div>
       <div class="legend">
         <span><i class="p12"></i>優先1・2</span>
         <span><i class="p3"></i>優先3</span>
         <span><i class="p45"></i>優先4・5</span>
         <span><i class="wallmark"></i>壁</span>
-        <button class="btn-sub" type="button" id="zoomBtn">拡大</button>
       </div>
-      <p class="hint">公式の地図画像は使っていません。ゾーンの相対位置・島と壁の並びを自前で組んだ概略図です。実際の配置は公式の会場案内で確認してください。</p>
     </section>
 
     <section class="card" id="listsec" hidden>

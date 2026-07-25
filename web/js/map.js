@@ -12,10 +12,11 @@ const GROUPS = [
   { label: '南 展示棟', zones: ['south12'] },
 ];
 
-// 会場1mあたりの表示px。大きめに取り、画面に収まらない分は横スクロールで見せる
-// (幅に合わせて縮めると記号が潰れて読めない)。装飾の寸法は u(px) で指定して、
-// この倍率を変えても記号の見た目の大きさが変わらないようにする。
-const PXPM = 2.7;
+// 図は幅いっぱいに収めて描く(横スクロールさせない)。装飾の寸法は会場座標(m)で
+// 直に指定すると小さすぎるので、u(px) 経由で「幅に対する割合」として決める。
+// PXPM を小さくするほど記号・文字が会場に対して相対的に大きくなる。
+// 幅300m 前後の会場を幅300〜600px に収めても番号が読める大きさになるよう調整。
+const PXPM = 1.15;
 const u = (px) => px / PXPM;
 
 const PAD = u(22);
@@ -118,11 +119,11 @@ export function renderMap(layout, plan) {
   const vh = y1 - y0;
 
   const out = [];
-  // viewBox は会場座標(m)、width/height は実px。縮小せず実寸で描き、
-  // はみ出す分は .mapwrap の横スクロールに任せる。
+  // viewBox が会場全体(離したマーカー込み)を包む。svg は幅100%で高さは縦横比なり。
+  // これで横スクロールは発生せず、枠(ホールの外周)も必ず端まで表示される。
   out.push('<svg xmlns="http://www.w3.org/2000/svg" '
-    + `width="${r(vw * PXPM)}" height="${r(vh * PXPM)}" `
     + `viewBox="${r(x0)} ${r(y0)} ${r(vw)} ${r(vh)}" `
+    + 'width="100%" preserveAspectRatio="xMidYMin meet" '
     + 'role="img" aria-label="会場の概略図と巡回順">');
   out.push(`<rect x="${r(x0)}" y="${r(y0)}" width="${r(vw)}" height="${r(vh)}" fill="${C.paper}"/>`);
 

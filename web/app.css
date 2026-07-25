@@ -741,14 +741,15 @@ button {
   border: 1px solid var(--line2);
   border-radius: 12px;
   background: var(--card);
-  overflow: auto;
-  max-height: min(72vh, 640px);
+  overflow-x: hidden;      /* 幅は必ず収める(横スクロールなし) */
+  overflow-y: auto;        /* 縦に長いときだけ縦スクロール */
+  max-height: min(78vh, 760px);
   -webkit-overflow-scrolling: touch;
 }
 
-/* 図は実寸(px)で描き、収まらない分は横スクロールで見せる。会場は横長なので
-   画面幅に縮めると記号が潰れる。拡大ボタンより素直な指スクロールに任せる。 */
-.mapwrap svg { display: block; height: auto; max-width: none; }
+/* 図は幅いっぱいに収める。高さは縦横比なりで、縦に長ければ .mapwrap が縦スクロール。
+   横スクロール・見切れ・枠が閉じない問題を避けるため、幅は絶対に超えさせない。 */
+.mapwrap svg { display: block; width: 100%; height: auto; }
 
 .legend {
   display: flex;

@@ -566,11 +566,16 @@ if (micOk()) {
     onMode: (m) => showMode(m === 'local'),
   });
   function showMode(local) {
-    note.classList.toggle('local', local);
-    note.innerHTML = local
-      ? 'この端末の中で認識しています。<b>音声は外へ送られません。</b>'
-      : '端末内での認識が使えないため、<b>音声はブラウザ提供元のサーバへ送られます</b>'
-        + '（通信も必要です）。文字にした後の処理はすべて端末内です。';
+    if (local) {
+      // 端末内認識のときは「外へ送っていない」とわざわざ誇示しない。
+      // プライバシーの説明はフッターにまとめてあるので、ここでは黙って隠す。
+      note.hidden = true;
+      return;
+    }
+    note.hidden = false;
+    note.classList.remove('local');
+    note.innerHTML = '端末内での認識が使えないため、<b>音声はブラウザ提供元のサーバへ送られます</b>'
+      + '（通信も必要です）。文字にした後の処理はすべて端末内です。';
   }
   // 押す前でも分かるように、開いた時点で使えるなら注意書きを先に直しておく。
   // (使えない場合は書き換えない。用意すれば使えるようになることがある)

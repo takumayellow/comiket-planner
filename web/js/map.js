@@ -94,14 +94,37 @@ export function renderMap(layout, plan) {
     return g.y + (g.hi - vy);
   };
 
+  // 立ち寄りの真の位置を出し、丸が重なるところは離す。番号の丸が被って
+  // 読めない不具合の対処。多数が同じ島に集まっても解けるよう全ペアを緩和する。
+  const nodes = stops.map((s) => ({
+    s, x: X(s.point.zone, s.point.x), y: Y(s.point.zone, s.point.y),
+    top: place.get(s.point.zone).y,
+  }));
+  relax(nodes);
+
+  // 図の範囲は、離したあとのマーカー(と番号ラベル)まで含めて取り直す。
+  // 会場枠の外へ押し出された丸が切れないようにする。
+  let x0 = 0;
+  let y0 = 0;
+  let x1 = totalW;
+  let y1 = totalH;
+  for (const n of nodes) {
+    x0 = Math.min(x0, n.x - MR - u(5));
+    x1 = Math.max(x1, n.x + MR + u(5));
+    y0 = Math.min(y0, n.y - MR - u(18));
+    y1 = Math.max(y1, n.y + MR + u(18));
+  }
+  const vw = x1 - x0;
+  const vh = y1 - y0;
+
   const out = [];
   // viewBox は会場座標(m)、width/height は実px。縮小せず実寸で描き、
   // はみ出す分は .mapwrap の横スクロールに任せる。
   out.push('<svg xmlns="http://www.w3.org/2000/svg" '
-    + `width="${r(totalW * PXPM)}" height="${r(totalH * PXPM)}" `
-    + `viewBox="0 0 ${r(totalW)} ${r(totalH)}" `
+    + `width="${r(vw * PXPM)}" height="${r(vh * PXPM)}" `
+    + `viewBox="${r(x0)} ${r(y0)} ${r(vw)} ${r(vh)}" `
     + 'role="img" aria-label="会場の概略図と巡回順">');
-  out.push(`<rect width="${r(totalW)}" height="${r(totalH)}" fill="${C.paper}"/>`);
+  out.push(`<rect x="${r(x0)}" y="${r(y0)}" width="${r(vw)}" height="${r(vh)}" fill="${C.paper}"/>`);
 
   for (const b of bands) {
     out.push(`<rect x="${r(PAD - u(14))}" y="${r(b.top - u(18))}" width="${r(u(3.4))}" `
@@ -134,31 +157,6 @@ export function renderMap(layout, plan) {
     }
   }
 
-  // 立ち寄りの真の位置を出し、丸が重なるところは押し合って離す。
-  // 番号の丸どうしが被って読めない不具合への対処。道すじも離した後の中心で引く。
-  const nodes = stops.map((s) => ({
-    s, x: X(s.point.zone, s.point.x), y: Y(s.point.zone, s.point.y),
-    top: place.get(s.point.zone).y,
-  }));
-  const minD = MR * 2 + u(3);
-  for (let i = 1; i < nodes.length; i++) {
-    for (let iter = 0; iter < 30; iter++) {
-      let moved = false;
-      for (let j = 0; j < i; j++) {
-        let dx = nodes[i].x - nodes[j].x;
-        let dy = nodes[i].y - nodes[j].y;
-        let d = Math.hypot(dx, dy);
-        if (d >= minD) continue;
-        if (d < 0.01) { dx = u(2); dy = -u(10); d = Math.hypot(dx, dy); } // 完全重なりをほどく
-        const push = (minD - d) * 0.5;
-        nodes[i].x += (dx / d) * push;
-        nodes[i].y += (dy / d) * push;
-        moved = true;
-      }
-      if (!moved) break;
-    }
-  }
-
   // 巡回の道すじ (同ホール内は実線、ホールをまたぐところは点線)
   for (let i = 1; i < nodes.length; i++) {
     const a = nodes[i - 1];
@@ -185,6 +183,35 @@ export function renderMap(layout, plan) {
 
   out.push('</svg>');
   return out.join('');
+}
+
+// 立ち寄りマーカーの重なりを解く簡易レイアウト。全ペアを繰り返し押し離し、
+// 完全一致は黄金角で決定的にほどく (乱数を使わず、同じ入力で同じ図になる)。
+// 同じ島に多数の立ち寄りが集まっても、丸が必ず離れるまで緩和する。
+function relax(nodes) {
+  const minD = MR * 2 + u(2.5);
+  const GA = 2.399963229; // 黄金角(rad)
+  for (let iter = 0; iter < 240; iter++) {
+    let worst = 0;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        let dx = nodes[j].x - nodes[i].x;
+        let dy = nodes[j].y - nodes[i].y;
+        let d = Math.hypot(dx, dy);
+        if (d >= minD) continue;
+        if (d < 1e-3) { dx = Math.cos(i * GA); dy = Math.sin(i * GA); d = 1; }
+        const push = (minD - d) / 2;
+        const ux = dx / d;
+        const uy = dy / d;
+        nodes[i].x -= ux * push;
+        nodes[i].y -= uy * push;
+        nodes[j].x += ux * push;
+        nodes[j].y += uy * push;
+        if (minD - d > worst) worst = minD - d;
+      }
+    }
+    if (worst < 0.02) break;
+  }
 }
 
 /** ホール枠の実寸。壁の折れ線はゾーンの公称 width/depth をはみ出すことがある。 */

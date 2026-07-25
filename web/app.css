@@ -18,6 +18,9 @@
   --aqua-d: #1a76a8; /* 白い文字を載せられる下地 / 白地の文字 (どちらも 5.0:1) */
   --aqua-dd: #14608a;/* 上の色をさらに沈めたもの。面の階調を作るのに使う (6.8:1) */
   --aqua-x: #0f4f74; /* 見出し */
+  --teal: #0e7c78;   /* 副主色。水色一辺倒の単調さを割る差し色 (白文字 5.0:1) */
+  --teal-d: #0a615e; /* 沈めた側 (白文字 7.3:1)。帯・グラデの端に使う */
+  --teal-1: #dcf1ef; /* teal の淡地。ラベルの座に敷く */
   --ink: #16344a;    /* 本文 */
   --ink2: #42627a;   /* 副次テキスト (白地に 6.6:1) */
   --ink3: #4f6d83;   /* 三次テキスト (白地に 5.4:1)。これ以上薄くしない */
@@ -72,13 +75,14 @@ b.warn { color: var(--rose-d); }
 @media (min-width: 720px) { .br-sp { display: inline; } }
 
 /* ---------- ヒーロー ---------- */
-/* カタログ表紙の「空」をそのまま面で作る。写真は使わない (再配布不可・重い)。
-   雲 = ぼかした白の楕円、ガラス面 = 斜めの帯。どちらも CSS だけで描く。 */
+/* カタログ表紙の「晴れた空と水色」を面で作り、そこへ東京ビッグサイトの
+   シルエットを起こして透かす。写真は使わない (再配布不可・重い) が、建物が
+   一目で分かる程度には描く。雲=ぼかした白の楕円、ガラス面=斜めの帯。 */
 
 .hero {
   position: relative;
   isolation: isolate;
-  padding: 0 0 6px;
+  padding: 0;
   overflow: hidden;
 }
 
@@ -86,7 +90,9 @@ b.warn { color: var(--rose-d); }
   position: absolute;
   inset: -40% 0 0;
   z-index: -2;
-  background: linear-gradient(178deg, #6cc0ea 0%, #98d6f2 34%, #cfeafb 66%, var(--sky-0) 100%);
+  background:
+    radial-gradient(120% 90% at 82% 8%, rgba(255, 255, 255, .5) 0%, rgba(255, 255, 255, 0) 46%),
+    linear-gradient(178deg, #5bb7e8 0%, #86ccef 30%, #b9e2f8 60%, #e2f3fd 84%, var(--sky-0) 100%);
 }
 
 .hero__sky .cloud {
@@ -97,120 +103,159 @@ b.warn { color: var(--rose-d); }
   filter: blur(2px);
 }
 
-.cloud--a { width: 52vw; height: 22vw; left: -8vw; top: 44%; }
-.cloud--b { width: 38vw; height: 15vw; right: -6vw; top: 36%; opacity: .85; }
-.cloud--c { width: 30vw; height: 12vw; left: 46%; top: 62%; opacity: .7; }
+.cloud--a { width: 52vw; height: 22vw; left: -8vw; top: 30%; }
+.cloud--b { width: 40vw; height: 15vw; right: -4vw; top: 12%; opacity: .8; }
+.cloud--c { width: 26vw; height: 11vw; left: 40%; top: 50%; opacity: .55; }
 
 /* ビッグサイトのガラス面。斜めの帯を薄く重ねるだけ */
 .hero__sky .glass {
   position: absolute;
   inset: 0;
-  opacity: .3;
+  opacity: .24;
   background:
     repeating-linear-gradient(64deg, rgba(255, 255, 255, .5) 0 2px,
       rgba(255, 255, 255, 0) 2px 46px),
     repeating-linear-gradient(-64deg, rgba(255, 255, 255, .32) 0 2px,
       rgba(255, 255, 255, 0) 2px 46px);
-  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, 0) 78%);
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, 0) 78%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, 0) 70%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, 0) 70%);
 }
 
-/* 空と本文の境目。まっすぐ切らずに弧で受ける */
-.hero__arc {
+/* 建物のシルエット。テキストの無い右下に、地面が波の切り替え線に接するよう置く。
+   ガラスの陰影を左右の面で分けて、平面のベタ塗りに見えないようにする。 */
+.hero__bigsight {
   position: absolute;
-  left: -8%;
-  right: -8%;
-  bottom: -46px;
-  height: 92px;
+  right: max(-24px, calc(50% - 700px));
+  bottom: 42px;
+  width: min(58vw, 560px);
+  height: auto;
   z-index: -1;
-  border-radius: 50% 50% 0 0;
-  background: var(--sky-0);
+  filter: drop-shadow(0 18px 26px rgba(13, 63, 95, .18));
 }
+
+.hero__bigsight .bs-cap { fill: #5f9fca; }
+.hero__bigsight .bs-l { fill: #a5d2ee; }
+.hero__bigsight .bs-r { fill: #7cb8e1; }
+.hero__bigsight .bs-deck { fill: #5f9fca; }
+.hero__bigsight .bs-leg { fill: #588fb8; }
+.hero__bigsight .bs-ground { fill: #588fb8; opacity: .5; }
+
+/* 空と本文の境目を波で受ける。まっすぐ切らない */
+.hero__wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  z-index: -1;
+  line-height: 0;
+}
+
+.hero__wave svg { display: block; width: 100%; height: clamp(46px, 6vw, 78px); }
+.hero__wave path { fill: var(--sky-0); }
 
 .hero__inner {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 38px 20px 56px;
+  padding: clamp(34px, 6vw, 62px) 20px clamp(64px, 9vw, 104px);
 }
 
 .hero__eyebrow {
-  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.24em;
-  color: var(--aqua-x);
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: var(--aqua-d);
+}
+
+/* 先頭の短い線。小さな見出しにも作りを持たせる (参考サイトのラベル組み) */
+.hero__tick {
+  width: 30px;
+  height: 2px;
+  background: var(--aqua-d);
+}
+
+.hero__eyebrow #meta {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--aqua-d);
+  color: #fff;
+  letter-spacing: 0.1em;
 }
 
 .hero h1 {
   margin: 0;
-  font-size: clamp(31px, 7.6vw, 54px);
+  font-size: clamp(29px, 7.6vw, 58px);
   font-weight: 900;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
   line-height: 1.12;
   color: #0d3f5f;
-  text-shadow: 0 2px 18px rgba(255, 255, 255, .65);
+  text-shadow: 0 2px 20px rgba(255, 255, 255, .7);
 }
 
-/* 「巡回」だけ白い札に抜く。空の上に白文字を直接置くとコントラストが足りない
-   (実機で読めなかった)。文字は濃紺のまま、下地の方を白くする。 */
+/* 「巡回」を塗りチップに抜く。白文字は明るい水色だと 2.97:1 しか出ないので、
+   下地は白い文字が載る --aqua-d 側で塗り、チップとして意図的に見せる。 */
 .hero h1 em {
-  position: relative;
-  z-index: 0;               /* ::before を自分の中だけで背面に置くため */
   display: inline-block;
-  padding: 0 .14em;
+  margin: 0 .02em;
+  padding: 0 .16em;
   font-style: normal;
-  color: var(--aqua-x);
+  color: #fff;
+  background: linear-gradient(135deg, var(--aqua-d), var(--aqua-dd));
+  border-radius: 14px;
+  box-shadow: 0 12px 26px -14px rgba(13, 63, 95, .8),
+    inset 0 1px 0 rgba(255, 255, 255, .3);
   text-shadow: none;
 }
 
-.hero h1 em::before {
-  content: "";
-  position: absolute;
-  inset: .1em -.02em .06em;
-  z-index: -1;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .88);
-  box-shadow: 0 10px 24px -16px rgba(13, 63, 95, .9);
-}
-
 .hero__lead {
-  margin: 16px 0 0;
-  max-width: 40em;
-  font-size: 15.5px;
+  margin: 18px 0 0;
+  max-width: 34em;
+  font-size: clamp(14.5px, 2.6vw, 16.5px);
   line-height: 1.85;
-  color: #0f4a6c;
+  color: #0d456a;
+  font-weight: 500;
 }
 
 .hero__facts {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 26px 0 0;
+  margin: 28px 0 0;
 }
 
 .hero__facts div {
   flex: 0 1 auto;
-  padding: 9px 16px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .72);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9), 0 6px 18px -12px rgba(15, 79, 116, .8);
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 10px 18px 11px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9),
+    0 10px 22px -14px rgba(15, 79, 116, .85);
   backdrop-filter: blur(6px);
 }
 
 .hero__facts dt {
-  display: inline;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   color: var(--aqua-d);
 }
 
 .hero__facts dd {
-  display: inline;
-  margin: 0 0 0 9px;
-  font-size: 14px;
-  font-weight: 700;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 800;
   color: var(--aqua-x);
+}
+
+@media (max-width: 560px) {
+  /* 狭い画面では建物が文字の裏に来るので、薄く沈めて読みやすさを優先する */
+  .hero__bigsight { width: 96vw; right: -18vw; bottom: 40px; opacity: .5; }
 }
 
 /* ---------- レイアウト ---------- */
@@ -225,11 +270,17 @@ main {
   main {
     display: grid;
     grid-template-columns: 424px 1fr;
-    gap: 24px;
+    gap: 28px;
     align-items: start;
-    padding-bottom: 56px;
+    padding: 12px 20px 56px;
   }
   .col-out { min-width: 0; }
+  /* 入力欄は画面に収まる高さなので、結果を下へ辿る間も左に貼り付けておく。
+     スクロールで入力と結果が別々に流れる不便を消す。 */
+  .col-in {
+    position: sticky;
+    top: 16px;
+  }
 }
 
 section { margin-top: 20px; }
@@ -241,10 +292,26 @@ section { margin-top: 20px; }
   border: 1px solid var(--line);
   border-radius: var(--r);
   box-shadow: var(--shadow);
-  padding: 20px 20px 22px;
+  padding: 22px 20px 22px;
 }
 
-@media (max-width: 480px) { .card { padding: 17px 14px 18px; } }
+/* 全部が白いカードだと単調に見えるので、節ごとに色の帯を上端に一本入れて
+   区別をつける。既定は主色 aqua、STEP2/地図は teal、結果は差し色の rose。 */
+.card::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: -1px;
+  height: 4px;
+  border-radius: var(--r) var(--r) 0 0;
+  background: linear-gradient(90deg, var(--aqua), var(--aqua-d));
+}
+
+.card--teal::before { background: linear-gradient(90deg, #33a7a2, var(--teal)); }
+.card--rose::before { background: linear-gradient(90deg, var(--rose), var(--rose-d)); }
+
+@media (max-width: 480px) { .card { padding: 19px 14px 18px; } }
 
 h2 {
   margin: 0 0 16px;
@@ -255,27 +322,23 @@ h2 {
   line-height: 1.35;
 }
 
-/* 節の頭の英字ラベル。日本語見出しの上に小さく置いて情報の階層を作る。
-   小さい字なので色は --aqua ではなく --aqua-d (白地に 5.0:1) を使う */
+/* 節の頭の英字ラベル。日本語見出しの上に小さなチップとして置き、情報の階層と
+   色のリズムを同時に作る。参考サイトの「小さな英字ラベル＋大きな和文見出し」の
+   組みに寄せた。文字は淡地でも 4.5:1 を割らない濃い側 (--aqua-x 等) を使う。 */
 .eyebrow {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 11.5px;
+  display: inline-block;
+  margin-bottom: 9px;
+  padding: 3px 11px 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.26em;
-  color: var(--aqua-d);
+  letter-spacing: 0.22em;
+  background: var(--sky-2);
+  color: var(--aqua-x);
 }
 
-.eyebrow::after {
-  content: '';
-  display: inline-block;
-  width: 26px;
-  height: 2px;
-  margin: 0 0 4px 9px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--aqua), rgba(46, 159, 216, 0));
-  vertical-align: middle;
-}
+.card--teal .eyebrow { background: var(--teal-1); color: var(--teal-d); }
+.card--rose .eyebrow { background: var(--rose-1); color: var(--rose-d); }
 
 h2 .sub {
   display: inline-block;
@@ -927,6 +990,9 @@ button {
    ページ幅いっぱいの帯として main の外に出しておく。 */
 
 .site-foot {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   margin-top: 34px;
   padding: 44px 14px 30px;
   background: linear-gradient(170deg, #12557c 0%, #0d3f5f 60%, #0a3450 100%);
@@ -935,7 +1001,25 @@ button {
   line-height: 1.9;
 }
 
+/* 参考サイトが色帯に巨大なロゴを透かすのに倣い、濃紺の帯へ「C108」を大きく敷く。
+   本文の裏に薄く沈める (可読性を落とさない) 装飾。 */
+.site-foot__mark {
+  position: absolute;
+  right: -2vw;
+  bottom: -3.2vw;
+  z-index: -1;
+  font-size: clamp(120px, 26vw, 340px);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.04em;
+  line-height: 0.8;
+  color: rgba(255, 255, 255, .045);
+  pointer-events: none;
+  user-select: none;
+}
+
 .site-foot__inner {
+  position: relative;
   max-width: 1120px;
   margin: 0 auto;
   display: grid;

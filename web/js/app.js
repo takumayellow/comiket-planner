@@ -5,7 +5,7 @@ import { LAYOUT_DOC } from './layout-data.js';
 import { Layout } from './layout.js';
 import { parseFreeText } from './freeform.js';
 import { placementKey } from './catalog.js';
-import { groupByBlock, noGrouping, formatNumbers } from './group.js';
+import { groupByBlock, formatNumbers } from './group.js';
 import { planRoute, pyRound, hhmmToMin, minToHhmm } from './router.js';
 import { renderMap, priorityClass } from './map.js';
 import { isSupported as micOk, createRecorder, localReady } from './voice.js';
@@ -254,8 +254,9 @@ function compute() {
     return;
   }
 
-  const { reps, groups } = $('#grp').checked
-    ? groupByBlock(placements) : noGrouping(placements);
+  // 経路も所要時間も常に島単位で組む。まとめ/展開のチェックは表示だけを変え、
+  // 計算には一切効かせない (チェックで時間が変わるのを止めるため)。
+  const { reps, groups } = groupByBlock(placements);
   const b = budgetInfo();
 
   const plan = planRoute(reps, layout, {
@@ -320,8 +321,7 @@ function render(unparsed = state.unparsed) {
     $('#mapsec').hidden = true;
   }
 
-  $('#stops').innerHTML = plan.stops.map((s, i) => stopRow(s, i)).join('');
-  bindStops();
+  renderStops();
 
   // 押した結果が画面のずっと下に出るので、読み上げ環境には要点だけ知らせる
   // (結果の全文を読み上げると長すぎる。件数と時間が分かれば下へ辿れる)
@@ -345,6 +345,29 @@ function render(unparsed = state.unparsed) {
   $('#extra').innerHTML = extra.join('');
 }
 
+function renderStops() {
+  const plan = state.plan;
+  if (!plan) return;
+  $('#stops').innerHTML = plan.stops.map((s, i) => stopRow(s, i)).join('');
+  bindStops();
+}
+
+// 展開表示: 島で拾う各サークルを1件ずつ並べる。番号ごとに名前・優先度が対応する
+// ので、当日そのまま消し込みの目印になる (まとめ表示だと「36,38 / 名前A / 名前B」で
+// どの番号がどの名前か対応が取れない)。経路・時刻は島単位のまま変わらない。
+function memberList(items) {
+  const rows = items.slice()
+    .sort((a, b) => a.number - b.number || a.ab.localeCompare(b.ab))
+    .map((x) => {
+      const nm = x.label
+        ? `<span class="mem__lab">${esc(x.label)}</span>`
+        : '<span class="mem__lab none">名前は未記入</span>';
+      return `<li><b>${esc(x.block)}${x.number}${esc(x.ab)}</b>`
+        + `<span class="pill ${priorityClass(x.priority)}">優先${x.priority}</span>${nm}</li>`;
+    });
+  return `<ul class="stop__mem">${rows.join('')}</ul>`;
+}
+
 function stopRow(s, i) {
   const p = s.placement;
   const items = state.groups.get(p.groupKey) || [p];
@@ -353,11 +376,15 @@ function stopRow(s, i) {
   const col = priorityClass(p.priority);   // 色は CSS クラスで当てる (CSP対応)
   const done = state.done.has(p.groupKey);
   const labels = [...new Set(items.map((x) => x.label).filter(Boolean))];
+  // チェックは表示だけを切り替える。外すと島の中を1件ずつ展開する。
+  const expand = !$('#grp').checked && items.length > 1;
   // 名前が無いと当日「ここは何だったか」が分からない。書いてあれば太く出し、
   // 無ければ調べに行く導線を出す (押しても消し込みは動かない)。
-  const name = labels.length
-    ? `<div class="stop__lab">${esc(labels.join(' / '))}</div>`
-    : `<div class="stop__lab none">名前は未記入</div>
+  const body = expand
+    ? memberList(items)
+    : labels.length
+      ? `<div class="stop__lab">${esc(labels.join(' / '))}</div>`
+      : `<div class="stop__lab none">名前は未記入</div>
        <a class="stop__find" href="${esc(findUrl(p, nums))}"
          target="_blank" rel="noopener noreferrer">調べる（要通信）</a>`;
   return `<div class="stop${done ? ' done' : ''}" data-k="${esc(p.groupKey)}">
@@ -368,7 +395,7 @@ function stopRow(s, i) {
       <div class="stop__loc">${esc(hall)} ${esc(p.block)}${esc(nums)}
         <u>${s.wall ? '壁' : '島'}</u>
         <span class="pill ${col}">優先${p.priority}</span></div>
-      ${name}
+      ${body}
     </div>
     <div class="stop__time"><b>${s.arrival}</b>
       <small>${s.walkFromPrev >= 0.5 ? `移動+${Math.round(s.walkFromPrev)}分` : '—'}</small></div>
@@ -472,13 +499,18 @@ $('#text').addEventListener('input', () => {
   clearTimeout(typing);
   typing = setTimeout(() => { save(); renderRead(); }, 250);
 });
-for (const id of ['#start', '#end', '#brk', '#zone', '#grp']) {
+for (const id of ['#start', '#end', '#brk', '#zone']) {
   $(id).addEventListener('change', () => {
     renderBudgetNote();
     save();
     if (state.plan) compute();
   });
 }
+// まとめ/展開は表示だけ。再計算せず一覧の描き直しだけ (時間はぶれない)。
+$('#grp').addEventListener('change', () => {
+  save();
+  if (state.plan) renderStops();
+});
 for (const b of document.querySelectorAll('[data-fill]')) {
   b.addEventListener('click', () => {
     $('#text').value = b.dataset.fill === 'sample' ? SAMPLE : '';

@@ -3,7 +3,7 @@
 
 // VERSION は手で書かない。scripts/stamp_sw_version.py が ASSETS 実体のハッシュから
 // 打ち直す (手動運用だと JS だけ直したときに install が発火せず古い版が residue する)。
-const VERSION = 'cp-ae79162e16d0';
+const VERSION = 'cp-038b36bb21ac';
 // './index.html' は入れない。Vercel の cleanUrls が /index.html → / に 308 する結果
 // リダイレクト済みレスポンスになり、Cache.put が TypeError を投げて install ごと失敗する
 // (= オフラインが一切効かなくなる)。シェルは './' だけを持つ。

@@ -1,13 +1,14 @@
 // 同じ島(ブロック記号+地区)の複数スペースを1つの立ち寄りにまとめる。
-// 実運用では「その島に着いたら番号帯を歩いて拾う」ので、スペース単位で経路を
-// 組むと同じ島を何度も往復する計算になってしまう。
+// 実運用では「その島に着いたら番号帯を歩いて拾う」ので、経路も時間も必ず島単位で
+// 積む。これは表示のまとめ/展開とは無関係で、常にこの単位で計算する
+// (まとめ表示にするかどうかで所要時間が変わってはいけない)。
 
 import { placement } from './catalog.js';
 
 /**
  * @param {Array} placements
  * @returns {{reps:Array, groups:Map<string,Array>}}
- *   reps: 経路計算に渡す代表 Placement (span:N タグつき)
+ *   reps: 経路計算に渡す代表 Placement (mp:優先度リスト タグつき)
  *   groups: 代表の groupKey -> その島で拾う元エントリ一覧
  */
 export function groupByBlock(placements) {
@@ -26,33 +27,23 @@ export function groupByBlock(placements) {
       (a, b) => a.priority - b.priority || a.number - b.number);
     const head = sorted[0];
     const labels = [...new Set(sorted.map((p) => p.label).filter(Boolean))];
-    // 同じスペースを2回書いても島の広さ(=滞在時間)は増えない
-    const spread = new Set(sorted.map((p) => `${p.number}|${p.ab}`)).size;
+    // 島の滞在時間は「その島で拾う各スペースを1つずつ見て買う」時間の合計。
+    // 同じスペースを2度書いても1回分。各スペースの優先度(=行列の代理)を並べて
+    // router に渡し、router 側で1件ずつの所要を足す (mp = member priorities)。
+    const bySpace = new Map();
+    for (const p of sorted) {
+      const sk = `${p.number}|${p.ab}`;
+      const cur = bySpace.get(sk);
+      if (cur == null || p.priority < cur) bySpace.set(sk, p.priority);
+    }
+    const mprio = [...bySpace.values()].sort((a, b) => a - b);
     reps.push(placement({
       ...head,
       groupKey: k,
       label: labels[0] || '',
-      tags: [...head.tags, `span:${spread}`,
-        ...(labels.length > 1 ? ['broad'] : [])],
+      tags: [...head.tags, `mp:${mprio.join('.')}`],
     }));
   }
-  return { reps, groups };
-}
-
-/** そのままスペース単位で回す場合も groupKey を持たせて表示側を揃える。 */
-export function noGrouping(placements) {
-  // キーに行番号を混ぜない。上に1行足しただけで全部ずれ、消し込みのチェックが
-  // 別のサークルに移ってしまう。同一スペースの重複だけ連番で区別する。
-  const groups = new Map();
-  const seen = new Map();
-  const reps = placements.map((p) => {
-    const base = `${p.block}|${p.number}|${p.ab}`;
-    const n = seen.get(base) ?? 0;
-    seen.set(base, n + 1);
-    const k = n ? `${base}#${n}` : base;
-    groups.set(k, [p]);
-    return placement({ ...p, groupKey: k });
-  });
   return { reps, groups };
 }
 

@@ -6,13 +6,15 @@
 const PRIORITY_URGENCY = { 1: 0.95, 2: 0.80, 3: 0.55, 4: 0.35, 5: 0.20 };
 
 // --- 現実的な滞在時間モデル(分) --------------------------------------------
-// 「全サークルに行列」は誇張。大半の島サークルは並ばず数分で見て買える。
-export const BASE_BROWSE = 4.0;          // 島の一般サークル: 並ばず見て買う
+// 立ち寄りは常に「島単位」で数える(その島に着いたら番号帯を歩いて拾う)。島の滞在
+// 時間は、そこで拾う各サークルを1件ずつ見て買う時間の合計。「1スペース20秒」の
+// ような非現実的な短縮はしない。表示のまとめ/展開では所要時間は変わらない。
+//   1サークルの実所要 = 到達+立ち読み+(買う)(BASE) + 優先度=行列の代理 + 壁ぶん。
+// 一般に「1島=数分で見て買える」が、行きたいサークルを複数挙げた島はその件数ぶん
+// 積み上がる(安全側=多めに見積もる)。
+export const BASE_BROWSE = 4.0;          // 1サークル: 並ばず見て買う下限
 export const WALL_QUEUE = 4.0;           // 壁は多少列ぶ(全部瞬殺ではない)
-const PRIORITY_QUEUE = { 1: 10.0, 2: 6.0, 3: 3.0, 4: 1.0, 5: 0.0 };
-const SPAN_QUEUE_PER = 0.3;              // 規模(スペース数)で微増
-const SPAN_QUEUE_CAP = 12;               // 大手でも頭打ち
-const BROAD_BROWSE_BONUS = 4.0;          // 「全般的に見る」ぶん
+const PRIORITY_QUEUE = { 1: 10.0, 2: 6.0, 3: 3.0, 4: 1.0, 5: 0.0 };  // 興味度=行列の代理
 const CROWD_WALK_FACTOR = 1.25;          // 通路混雑で歩行が公称より少し延びる
 const SELLOUT_HALFLIFE_MIN = 90;         // 緊急度1.0が半分の価値になるまで(分)
 
@@ -37,14 +39,20 @@ export function minToHhmm(x) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function span(p) {
+// 島で拾う各スペースの優先度リスト。group.js が mp:2.2.3 の形で付ける。
+// タグが無い(CLI 等でスペース単位のまま渡す)ときは、その1件だけ。
+function members(p) {
   for (const t of p.tags) {
-    if (t.startsWith('span:')) {
-      const n = parseInt(t.slice(5), 10);
-      return Number.isNaN(n) ? 1 : Math.max(1, n);
+    if (t.startsWith('mp:')) {
+      const out = [];
+      for (const part of t.slice(3).split('.')) {
+        const n = parseInt(part, 10);
+        if (!Number.isNaN(n)) out.push(n);
+      }
+      if (out.length) return out;
     }
   }
-  return 1;
+  return [p.priority];
 }
 
 function urgency(p, layout) {
@@ -55,12 +63,11 @@ function urgency(p, layout) {
 }
 
 export function dwell(p, layout) {
-  let q = PRIORITY_QUEUE[p.priority] ?? 9.0;
-  if (layout.isWall(p.block)) q += WALL_QUEUE;
-  q += Math.min(span(p) - 1, SPAN_QUEUE_CAP) * SPAN_QUEUE_PER;
-  let d = BASE_BROWSE + q;
-  if (p.tags.includes('broad')) d += BROAD_BROWSE_BONUS;
-  return d;
+  // 島の滞在 = その島で拾う各サークルの (BASE + 優先度ぶんの行列 + 壁ぶん) の総和。
+  // まとめ/展開の表示切替では中身が変わらないので、所要時間もぶれない。
+  const wall = layout.isWall(p.block) ? WALL_QUEUE : 0;
+  return members(p).reduce(
+    (a, mp) => a + BASE_BROWSE + (PRIORITY_QUEUE[mp] ?? 9.0) + wall, 0);
 }
 
 function walk(layout, a, b) {

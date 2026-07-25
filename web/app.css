@@ -864,6 +864,21 @@ button {
 
 .stop__find:hover { color: var(--aqua-x); border-bottom-color: var(--aqua); }
 
+/* 展開表示: 島の中のサークルを1件ずつ (番号 ↔ 名前 ↔ 優先度 が対応する) */
+.stop__mem { list-style: none; margin: 6px 0 0; padding: 0; }
+.stop__mem li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 3px 0;
+  font-size: 14px;
+  border-top: 1px dashed var(--line2);
+}
+.stop__mem li:first-child { border-top: none; }
+.stop__mem li b { font-weight: 800; color: var(--ink); white-space: nowrap; }
+.stop__mem .mem__lab { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.stop__mem .mem__lab.none { color: var(--ink3); font-weight: 400; }
+
 .stop__time {
   flex: 0 0 88px;
   text-align: right;

@@ -563,23 +563,27 @@ if (micOk()) {
     },
     onError: (m) => { msg = m; live.textContent = m; live.classList.add('bad'); },
     // 端末内で認識できたかどうかで、注意書きの中身が変わる。黙って切り替えない
-    onMode: (m) => showMode(m === 'local'),
+    onMode: (m) => showMode(m),
   });
-  function showMode(local) {
-    if (local) {
+  // mode: 'local'(端末内で認識) / 'preparing'(初回モデルを用意中) / 'cloud'(提供元へ送る)
+  function showMode(mode) {
+    if (mode === 'local') {
       // 端末内認識のときは「外へ送っていない」とわざわざ誇示しない。
       // プライバシーの説明はフッターにまとめてあるので、ここでは黙って隠す。
       note.hidden = true;
       return;
     }
     note.hidden = false;
-    note.classList.remove('local');
-    note.innerHTML = '端末内での認識が使えないため、<b>音声はブラウザ提供元のサーバへ送られます</b>'
-      + '（通信も必要です）。文字にした後の処理はすべて端末内です。';
+    note.classList.toggle('local', mode === 'preparing');
+    note.innerHTML = mode === 'preparing'
+      ? '端末内の音声モデルを準備しています（初回だけ・時間がかかることがあります）。'
+        + '用意ができると<b>この端末の中で認識</b>します。それまでは認識できないことがあります。'
+      : '端末内での認識が使えないため、<b>音声はブラウザ提供元のサーバへ送られます</b>'
+        + '（通信も必要です）。文字にした後の処理はすべて端末内です。';
   }
   // 押す前でも分かるように、開いた時点で使えるなら注意書きを先に直しておく。
   // (使えない場合は書き換えない。用意すれば使えるようになることがある)
-  localReady().then((ok) => { if (ok) showMode(true); });
+  localReady().then((ok) => { if (ok) showMode('local'); });
   $('#micBtn').addEventListener('click', () => (rec.active ? rec.stop() : rec.start()));
   // タブを離れたら勝手に止める。押しっぱなしで放置すると、その間の音声が
   // ブラウザ提供元へ送られ続けることになる。

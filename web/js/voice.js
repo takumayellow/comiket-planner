@@ -31,23 +31,30 @@ export async function localReady() {
   }
 }
 
-/** 端末内認識が使えるか調べ、必要ならモデルの用意まで済ませる。
- *  未対応ブラウザでは静かに false を返す (クラウド経路へ落ちるだけ)。
- *  install() はユーザー操作の延長でしか通らないことがあるので、マイクを押した
- *  タイミングから呼ぶこと。 */
+/** 端末内認識の状態を返す: 'ready'(すぐ使える) / 'preparing'(初回モデルを用意中) /
+ *  'no'(端末内は不可)。
+ *  ポイント: install() はモデルの実ダウンロードで、完了まで待つと数分かかることが
+ *  ある。待って固まらせない — ダウンロードを着火して即 'preparing' を返し、次に
+ *  押したときに 'ready' になっていれば端末内で動かす。
+ *  install() は「ユーザー操作(gesture)の中でのみ」呼べる実装があるので、必ず
+ *  マイクを押した流れ(gesture が生きているうち)から、余計な await を挟まずに呼ぶ。
+ *  Vivaldi/Brave 等はクラウド認識のバックエンドを持たない(network エラーになる)ので、
+ *  これらでは端末内モデルの用意が唯一の道になる。 */
 export async function prepareLocal() {
-  if (!Impl || typeof Impl.available !== 'function') return false;
+  if (!Impl || typeof Impl.available !== 'function') return 'no';
   const q = { langs: [LANG], processLocally: true };
   try {
-    let st = await Impl.available(q);
-    if (st === 'available') return true;
-    if (st === 'unavailable') return false;
-    if (typeof Impl.install !== 'function') return false;
-    await Impl.install(q);                 // 戻り値の型が実装で揺れるので状態で見る
-    st = await Impl.available(q);
-    return st === 'available';
+    // gesture が生きているうちに install を着火する(available を先に await して
+    // 操作許可が切れると弾かれる実装があるため)。すでに用意済みなら無害。
+    if (typeof Impl.install === 'function') {
+      try { Impl.install(q).catch(() => {}); } catch { /* 未対応 */ }
+    }
+    const st = await Impl.available(q);
+    if (st === 'available') return 'ready';
+    if (st === 'unavailable') return 'no';
+    return 'preparing';                    // 'downloadable' / 'downloading'
   } catch {
-    return false;                          // 判定できないならクラウドで動かす
+    return 'no';                           // 判定できないならクラウドで動かす
   }
 }
 
@@ -81,10 +88,12 @@ export function createRecorder(cb) {
     'language-not-supported': 'このブラウザは日本語の音声認識に対応していません。',
   };
 
-  // network だけは文面を分ける。原因が端末ではなく通信側にあることと、
-  // 打ち込みに切り替えれば作業を続けられることを書く。
+  // network だけは文面を分ける。原因は「通信が悪い」だけでなく、Vivaldi/Brave 等
+  // クラウド認識のバックエンドを持たないブラウザや、端末内モデルの初回準備中でも
+  // 起きる。原因を決めつけず、打ち込みに切り替えれば続けられることを書く。
   const NET_MSG = '音声認識サーバに接続できませんでした。'
-    + 'この機能だけは通信が要ります（圏内で試すか、テキストで入力してください）。';
+    + 'お使いのブラウザが音声認識に対応していないことがあります（ChromeやEdgeでお試しください）。'
+    + '通信環境や、端末内モデルの初回準備中が原因のこともあります。テキストでも入力できます。';
 
   function build() {
     const r = new Impl();
@@ -169,12 +178,17 @@ export function createRecorder(cb) {
       want = true;
       retries = 0;
       netFails = 0;
-      // 端末内認識の可否は初回だけ調べる。判定を待つ間に押し直されることがあるので、
-      // 待った後に want が下りていないかを見てから始める。
+      // 端末内認識の可否を調べる。判定を待つ間に押し直されることがあるので、待った
+      // 後に want が下りていないかを見てから始める。'preparing'(モデル用意中)のうちは
+      // まだ確定でないので probed を立てず、次に押したとき再判定して 'ready' を拾う。
       if (!probed) {
-        probed = true;
-        local = await prepareLocal();
-        cb.onMode?.(local ? 'local' : 'cloud');
+        const st = await prepareLocal();      // 'ready' | 'preparing' | 'no'
+        const nowLocal = st === 'ready';
+        // processLocally は認識器の生成時にしか効かない。preparing→ready でモードが
+        // 変わったら、古い認識器を捨てて作り直す(でないとクラウドのまま動いてしまう)。
+        if (nowLocal !== local) { local = nowLocal; rec = null; }
+        if (st !== 'preparing') probed = true;
+        cb.onMode?.(st === 'ready' ? 'local' : st === 'preparing' ? 'preparing' : 'cloud');
         if (!want) return;
       }
       // 直前の stop() の end がまだ来ていない場合は、その end 側で入り直す

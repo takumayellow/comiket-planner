@@ -747,9 +747,27 @@ button {
   -webkit-overflow-scrolling: touch;
 }
 
-/* 図は幅いっぱいに収める。高さは縦横比なりで、縦に長ければ .mapwrap が縦スクロール。
+/* スマホ: 図は幅いっぱい。高さは縦横比なりで、縦に長ければ .mapwrap が縦スクロール。
    横スクロール・見切れ・枠が閉じない問題を避けるため、幅は絶対に超えさせない。 */
 .mapwrap svg { display: block; width: 100%; height: auto; }
+
+/* PC: 会場図は細長い(縦長)ので、幅いっぱいに広げると縦に伸びて枠内に収まらず
+   縦スクロールになっていた。広い画面では幅でなく高さに合わせて縮め、横は中央寄せ。
+   これで全体が一目で入り、スクロールが出ない(スマホの見え方はそのまま)。 */
+@media (min-width: 940px) {
+  .mapwrap {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    overflow: hidden;        /* 高さに収めるのでスクロールは要らない */
+  }
+  .mapwrap svg {
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: min(72vh, 680px);
+  }
+}
 
 .legend {
   display: flex;

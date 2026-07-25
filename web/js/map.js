@@ -24,6 +24,12 @@ const GAP_IN = u(26);   // 同じ棟のホール間
 const GAP_GRP = u(42);  // 棟と棟の間
 const MR = u(11);       // 立ち寄りマーカーの半径
 
+// ホールの描画幅の上限(会場座標 m)。東123 は 285m の細長い帯で、実寸で描くと
+// 横に間延びして図全体を潰す。立ち寄り位置の相対関係は保ったまま、広すぎる棟の
+// 描画幅だけここに収める(概略図なので実寸に厳密でなくてよい)。他の棟(西172/南150/
+// 東7 97)はこれ以下なので素通し = 東だけが縮む。
+const ZONE_W_CAP = 176;
+
 // 図は「白い紙に水色の線」。app.css の :root と対で管理すること
 // (--sky-*/--aqua-*/--ink*/--rose と同じ値を使う)。
 const C = {
@@ -65,31 +71,38 @@ export function renderMap(layout, plan) {
   const stops = plan?.stops || [];
   const hit = new Set(stops.map((s) => s.placement.block));
 
-  const place = new Map(); // zoneId -> {x, y, z, lo, hi, w}
+  // 立ち寄りのある棟・ホールだけ描く。円がひとつも無いところを延々と描いて
+  // 図を間延びさせない(はみ出す原因になる)。
+  const usedZones = new Set(stops.map((s) => s.point.zone));
+
+  const place = new Map(); // zoneId -> {x, y, z, sx, lo, hi, w}
   const bands = [];
   let maxW = 0;
   let y = PAD;
+  let drawn = 0;
 
-  groups.forEach((g, gi) => {
-    const zs = g.zones.filter((z) => layout.zones[z]);
-    if (!zs.length) return;
-    y += gi > 0 ? GAP_GRP - GAP_IN : u(12); // 棟の見出しを置く余白
+  for (const g of groups) {
+    const zs = g.zones.filter((z) => layout.zones[z] && usedZones.has(z));
+    if (!zs.length) continue;
+    y += drawn > 0 ? GAP_GRP - GAP_IN : u(12); // 棟の見出しを置く余白
     const top = y;
     zs.forEach((zid, i) => {
       const z = layout.zones[zid];
       const ext = extent(z);
+      const sx = Math.min(1, ZONE_W_CAP / ext.w); // 広すぎる棟だけ横に縮める
       if (i > 0) y += GAP_IN;
-      place.set(zid, { x: PAD, y, z, ...ext });
-      maxW = Math.max(maxW, ext.w);
+      place.set(zid, { x: PAD, y, z, sx, ...ext });
+      maxW = Math.max(maxW, ext.w * sx);
       y += ext.hi - ext.lo;
     });
     bands.push({ label: g.label, top, bottom: y });
     y += GAP_IN;
-  });
+    drawn += 1;
+  }
 
   const totalW = PAD + maxW + PAD;
   const totalH = y - GAP_IN + PAD;
-  const X = (zid, vx) => place.get(zid).x + vx;
+  const X = (zid, vx) => { const g = place.get(zid); return g.x + vx * g.sx; };
   const Y = (zid, vy) => {
     const g = place.get(zid);
     return g.y + (g.hi - vy);
@@ -136,10 +149,11 @@ export function renderMap(layout, plan) {
   }
 
   for (const [zid, g] of place) {
-    out.push(`<rect x="${r(g.x - u(6))}" y="${r(g.y - u(6))}" width="${r(g.w + u(12))}" `
+    const zw = g.w * g.sx;
+    out.push(`<rect x="${r(g.x - u(6))}" y="${r(g.y - u(6))}" width="${r(zw + u(12))}" `
       + `height="${r(g.hi - g.lo + u(12))}" fill="${C.zone}" stroke="${C.zoneEdge}" `
       + `stroke-width="${r(u(1))}"/>`);
-    out.push(`<text x="${r(g.x + g.w - u(1))}" y="${r(g.y - u(9))}" `
+    out.push(`<text x="${r(g.x + zw - u(1))}" y="${r(g.y - u(9))}" `
       + `fill="${C.label}" font-size="${r(u(11))}" text-anchor="end">${esc(g.z.label)}</text>`);
 
     for (const b of g.z.blocks) {

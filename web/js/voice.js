@@ -65,6 +65,7 @@ export function createRecorder(cb) {
   let local = false;      // 端末内認識で動いているか
   let probed = false;     // 端末内が使えるか調べたか (調べるのは1回でいい)
   let timer = null;
+  let pending = '';       // まだ確定(isFinal)していない聞き取り中の文字
 
   const RETRY_LIMIT = 12;               // 無音で終わり続けるときの打ち切り
   const NET_RETRY = 2;                  // 一時的な切断は黙って掛け直す回数
@@ -104,7 +105,11 @@ export function createRecorder(cb) {
       }
       retries = 0;                       // 聞き取れているので掛け直しの数え直し
       netFails = 0;
-      cb.onInterim(interim.trim());
+      // 端末内認識やスマホでは、聞き取った語を isFinal=true に昇格させないまま
+      // 認識を打ち切ることがある(no-speech / 発話区切り)。その取りこぼしを防ぐため、
+      // 未確定の interim を覚えておき、end 時に確定として拾う。
+      pending = interim.trim();
+      cb.onInterim(pending);
     });
 
     r.addEventListener('error', (e) => {
@@ -126,6 +131,9 @@ export function createRecorder(cb) {
     // なるので、必ず間を空けて begin() 経由で入り直す。
     r.addEventListener('end', () => {
       running = false;
+      // isFinal を待たずに切れても、聞き取り中だった語は捨てずに確定させる。
+      // (これが無いと「喋ったのに何も入らない」= 音声入力が反映されない、になる)
+      if (pending) { cb.onFinal(pending); pending = ''; }
       cb.onInterim('');
       if (!want) { cb.onState('off'); return; }
       if (retries >= RETRY_LIMIT) {

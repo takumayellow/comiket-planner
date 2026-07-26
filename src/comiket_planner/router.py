@@ -124,13 +124,16 @@ def _is_wall(p: Placement, layout: Layout) -> bool:
 
 
 def _dwell(p: Placement, layout: Layout) -> float:
-    # 滞在 = そこで拾う各サークルの所要の総和。
-    #   島: BASE_BROWSE のみ(手に取って軽く試し読み→会計。列は無い)。
-    #   壁: BASE_BROWSE + WALL_QUEUE + 人気ぶりの列(WALL_LINE)。
+    # 滞在 = そこで拾う各サークルの手に取り+軽い試し読み(BASE_BROWSE)の総和。
+    #   島: それだけ(列は無い)。
+    #   壁: そのブロックでは1回だけ並ぶ(スペースごとに並び直さない)。基本の列
+    #       WALL_QUEUE に、最も人気なサークルぶんの列(WALL_LINE の最大)を1つ足す。
     # まとめ/展開の表示切替では中身が変わらないので、所要時間もぶれない。
-    wall = _is_wall(p, layout)
-    return sum(BASE_BROWSE + (WALL_QUEUE + WALL_LINE.get(mp, 3.0) if wall else 0.0)
-               for mp in _members(p))
+    members = _members(p)
+    base = BASE_BROWSE * len(members)
+    if _is_wall(p, layout):
+        return base + WALL_QUEUE + max(WALL_LINE.get(mp, 3.0) for mp in members)
+    return base
 
 
 def _walk(layout: Layout, a: Point, b: Point) -> float:

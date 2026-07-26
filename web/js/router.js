@@ -63,13 +63,16 @@ function urgency(p, layout) {
 }
 
 export function dwell(p, layout) {
-  // 滞在 = そこで拾う各サークルの所要の総和。
-  //   島: BASE_BROWSE のみ(手に取って軽く試し読み→会計。列は無い)。
-  //   壁: BASE_BROWSE + WALL_QUEUE + 人気ぶりの列(WALL_LINE)。
+  // 滞在 = そこで拾う各サークルの手に取り+軽い試し読み(BASE_BROWSE)の総和。
+  //   島: それだけ(列は無い)。
+  //   壁: そのブロックでは1回だけ並ぶ(スペースごとに並び直さない)。基本の列
+  //       WALL_QUEUE に、最も人気なサークルぶんの列(WALL_LINE の最大)を1つ足す。
   // まとめ/展開の表示切替では中身が変わらないので、所要時間もぶれない。
-  const wall = layout.isWall(p.block);
-  return members(p).reduce(
-    (a, mp) => a + BASE_BROWSE + (wall ? WALL_QUEUE + (WALL_LINE[mp] ?? 3.0) : 0), 0);
+  const mps = members(p);
+  const base = BASE_BROWSE * mps.length;
+  if (!layout.isWall(p.block)) return base;
+  const line = Math.max(...mps.map((mp) => WALL_LINE[mp] ?? 3.0));
+  return base + WALL_QUEUE + line;
 }
 
 function walk(layout, a, b) {

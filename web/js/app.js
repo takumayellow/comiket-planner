@@ -587,7 +587,6 @@ for (const id of ['#start', '#end']) {
 }
 const toast = createToast($('#toast'));
 const tabs = createTabs({ onShow: (name) => { if (name === 'today') renderTodayPanel(); } });
-const firstVisit = ls(() => localStorage.getItem(`${LS}text`)) === null;
 restore();
 renderBudgetNote();
 $('#meta').textContent = LAYOUT_DOC.event || 'コミックマーケット';
@@ -600,8 +599,9 @@ for (const id of ['#start', '#end']) {
 }
 if ($('#text').value.trim()) compute();
 else render([]);
-// 組んだ巡回順があれば当日から。初めて開いたとき (記入例で組んだだけ) は入力から
-tabs.show(state.plan && !firstVisit ? 'today' : 'list');
+// 自分のリストで組んだ巡回順があれば当日から。記入例のままなら入力から
+// (記入例も計算して保存されるので、2回目以降も「初めて」とは判定できない)
+tabs.show(state.plan && $('#text').value !== SAMPLE ? 'today' : 'list');
 
 // 時計。見えていない間は止まっていてよい (戻ったときに描き直す)
 setInterval(() => { if (!document.hidden) renderTodayPanel(); }, 20000);

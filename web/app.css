@@ -260,31 +260,30 @@ b.warn { color: var(--rose-d); }
 
 /* ---------- レイアウト ---------- */
 
-main {
-  max-width: 1120px;
+/* 画面は下のタブで切り替える1枚ずつ。どの画面も片手で縦に辿る1列にする
+   (広い画面でも横に並べない。当日に見る画面と入力の画面は同時に要らない) */
+:root { --tabbar-h: 68px; }
+
+.panel {
+  max-width: 760px;
   margin: 0 auto;
-  padding: 8px 14px 60px;
+  /* 最後の行が下のタブに隠れないように */
+  padding: 14px 14px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 24px);
 }
 
-@media (min-width: 940px) {
-  main {
-    display: grid;
-    grid-template-columns: 424px 1fr;
-    gap: 28px;
-    align-items: start;
-    padding: 12px 20px 56px;
-  }
-  .col-out { min-width: 0; }
-  /* 入力欄は画面に収まる高さなので、結果を下へ辿る間も左に貼り付けておく。
-     スクロールで入力と結果が別々に流れる不便を消す。 */
-  .col-in {
-    position: sticky;
-    top: 16px;
-  }
+/* 入力の画面は空のヒーローとフッターを端まで敷くので、入れ物は広げてカードだけ寄せる。
+   フッターの紺はタブの裏まで伸ばす (間に空色の帯が残らないように) */
+.panel--list { max-width: none; padding: 0; }
+.panel--list .site-foot {
+  padding-bottom: calc(30px + var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+.panel--list > .card {
+  max-width: 732px;
+  margin: 20px max(14px, calc(50% - 366px)) 0;
 }
 
 section { margin-top: 20px; }
-.col-in > section:first-child, .col-out > section:first-child { margin-top: 0; }
+.panel > section:first-child { margin-top: 0; }
 
 .card {
   position: relative;
@@ -1083,4 +1082,377 @@ button {
   font-size: 11.5px;
   letter-spacing: 0.18em;
   color: rgba(255, 255, 255, .62);
+}
+
+/* ---------- 当日 ---------- */
+/* 会場で開いたとき最初に見る画面。いま何時か・予定よりどれだけ遅れているか・
+   次にどこへ行くかだけを大きく出す。押すボタンは親指の届く下側に集める。 */
+
+.panel--today { max-width: none; padding-left: 0; padding-right: 0; padding-top: 0; }
+
+.td-head {
+  padding: calc(14px + env(safe-area-inset-top)) 18px 26px;
+  background: linear-gradient(178deg, #86ccef, #b9e2f8 55%, var(--sky-0));
+  color: var(--aqua-x);
+}
+
+.td-head > *, .td-body { max-width: 732px; margin-left: auto; margin-right: auto; }
+
+.td-head__row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.td-chip {
+  display: inline-block;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: var(--aqua-x);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.td-chip--soft { background: rgba(255, 255, 255, .78); color: var(--aqua-x); }
+
+.td-clock {
+  margin: 10px auto 2px;
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.td-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.td-pace {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--teal);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.td-pace.late { background: var(--rose-d); }
+
+.td-end { font-size: 14px; font-weight: 700; color: var(--ink); }
+
+.td-body { padding: 0 14px; margin-top: -8px; }
+
+.td-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding: 20px 18px 18px;
+}
+
+.td-card__band { position: absolute; inset: 0 0 auto; height: 6px; }
+.td-card__band.p12 { background: linear-gradient(90deg, var(--rose), var(--rose-d)); }
+.td-card__band.p3 { background: linear-gradient(90deg, var(--aqua-d), var(--aqua-dd)); }
+.td-card__band.p45 { background: linear-gradient(90deg, #55758c, var(--ink2)); }
+
+.td-card__top { display: flex; gap: 16px; align-items: center; }
+.td-card__main { min-width: 0; }
+
+.td-sym {
+  flex: 0 0 86px;
+  height: 96px;
+  border-radius: 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.td-sym b { font-size: 44px; line-height: 1; font-weight: 900; }
+.td-sym span { font-size: 12px; font-weight: 700; margin-top: 6px; }
+.td-sym.p12 { background: linear-gradient(160deg, var(--rose), var(--rose-d)); }
+.td-sym.p3 { background: linear-gradient(160deg, var(--aqua-d), var(--aqua-dd)); }
+.td-sym.p45 { background: linear-gradient(160deg, #55758c, var(--ink2)); }
+/* 壁サークルは記号の内側に白い輪を入れて、島と見分ける */
+.td-sym.wall { outline: 2.5px solid #fff; outline-offset: -8px; }
+
+.td-kicker { font-size: 13px; font-weight: 800; color: var(--teal-d); letter-spacing: 0.06em; }
+.td-loc { font-size: 26px; font-weight: 900; color: var(--aqua-x); line-height: 1.3; }
+.td-name { font-size: 16px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.td-name.none, .td-up__name.none { color: var(--ink3); font-weight: 500; font-size: 14px; }
+.td-tags { margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+.td-tags .pill { margin-left: 0; }
+
+.td-wall {
+  display: inline-block;
+  padding: 0 8px;
+  border: 1.5px solid var(--aqua-x);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--aqua-x);
+}
+
+.td-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.td-facts div { background: var(--sky-1); border-radius: 12px; padding: 9px 12px; }
+.td-facts dt { font-size: 12px; font-weight: 700; color: var(--ink2); }
+.td-facts dd { margin: 0; font-size: 21px; font-weight: 900; color: var(--aqua-x); }
+
+.td-acts { margin-top: 16px; display: grid; gap: 10px; }
+.td-acts__row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.td-done {
+  min-height: 58px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--aqua-d) 0%, #17699a 55%, var(--aqua-dd) 100%);
+  color: #fff;
+  font-size: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34), 0 12px 24px -14px rgba(26, 118, 168, .95);
+}
+
+.td-sold, .td-skip {
+  min-height: 48px;
+  border-radius: 999px;
+  font-size: 15px;
+}
+
+.td-sold { background: var(--rose-1); color: var(--rose-d); border: 1.5px solid #f4c2cf; }
+.td-skip { background: var(--card); color: var(--teal-d); border: 1.5px solid var(--line2); }
+.td-done:active, .td-sold:active, .td-skip:active { transform: translateY(1px); }
+
+.td-card--fin { text-align: center; padding: 30px 18px 24px; }
+.td-card--fin p { margin: 6px 0 14px; color: var(--ink2); font-size: 15px; }
+.td-fin { font-size: 21px; font-weight: 900; color: var(--aqua-x); }
+
+.td-rest { margin-top: 22px; }
+.td-rest__head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.td-rest__head h2 { margin: 0; font-size: 16px; color: var(--aqua-x); }
+#tdProg { font-size: 14px; font-weight: 800; color: var(--ink2); font-variant-numeric: tabular-nums; }
+
+.td-ups { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+
+.td-up {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 9px 12px;
+}
+
+.td-up__sym {
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.td-up__sym.p12 { background: var(--rose-d); }
+.td-up__sym.p3 { background: var(--aqua-d); }
+.td-up__sym.p45 { background: var(--ink2); }
+.td-up__main { flex: 1; min-width: 0; }
+.td-up__main b { display: block; font-size: 15px; color: var(--ink); }
+.td-up__name { font-size: 13px; color: var(--ink2); overflow-wrap: anywhere; }
+.td-up__time { text-align: right; }
+.td-up__time b { display: block; font-size: 16px; color: var(--aqua-x); font-variant-numeric: tabular-nums; }
+.td-up__time small { font-size: 12px; color: var(--ink2); white-space: nowrap; }
+.td-none { margin: 12px 0 0; font-size: 14px; color: var(--ink2); }
+
+/* ---------- 巡回順の付け足し ---------- */
+
+/* 棟・ホールをまたぐ所。移動が長いのはここなので線と色で目に留める */
+.xfer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 4px 3px;
+  padding-top: 8px;
+  border-top: 2px dashed #8fd0cc;
+  font-size: 13px;
+  color: var(--teal-d);
+}
+
+.xfer b { white-space: nowrap; }
+.xfer + .stop { margin-top: 6px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 10px;
+  border-radius: 999px;
+  background: var(--sky-1);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.chip::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--ink2); }
+.chip.b-east::before { background: var(--aqua-d); }
+.chip.b-west::before { background: var(--teal); }
+.chip.b-south::before { background: var(--rose); }
+.chip b { color: var(--aqua-x); }
+
+.stop__st {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--sky-2);
+  color: var(--aqua-x);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.stop.sold .stop__st { background: var(--rose-1); color: var(--rose-d); }
+.stop.skip { border-style: dashed; }
+.stop.skip .stop__st { background: var(--teal-1); color: var(--teal-d); }
+
+/* ---------- 地図の付け足し ---------- */
+
+.legend i.fin { background: #9fbfd2; }
+
+.mk { cursor: pointer; }
+.mk:focus { outline: none; }
+.mk__focus { stroke: transparent; }
+.mk:focus-visible .mk__focus { stroke: var(--aqua-d); }
+
+.map-next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--aqua-x), #0d3f5f);
+  color: #fff;
+  text-align: left;
+  letter-spacing: 0.04em;
+  box-shadow: var(--shadow);
+}
+
+.map-next__k { font-size: 12.5px; color: #cfe6f3; }
+.map-next b { font-size: 20px; }
+.map-next__t { font-size: 13px; font-weight: 700; color: #cfe6f3; }
+
+.empty .btn-sub { display: block; margin: 14px auto 0; }
+
+/* ---------- 下のタブ ---------- */
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 0 max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
+  background: rgba(255, 255, 255, .96);
+  border-top: 1px solid var(--line2);
+  box-shadow: 0 -8px 24px -18px rgba(15, 79, 116, .6);
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: var(--tabbar-h);
+  background: transparent;
+  color: var(--ink3);
+  border-radius: 0;
+  letter-spacing: 0.04em;
+}
+
+.tab svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab b { font-size: 13px; line-height: 1.2; }
+.tab small { font-size: 10.5px; font-weight: 600; line-height: 1.2; }
+
+.tab[aria-selected="true"] { color: var(--aqua-x); }
+.tab[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 28px;
+  height: 4px;
+  margin-left: -14px;
+  border-radius: 0 0 4px 4px;
+  background: var(--aqua-d);
+}
+
+.tab:focus-visible { outline-offset: -4px; }
+
+/* ---------- 知らせ ---------- */
+/* 読み上げ用の live region を兼ねるので、隠すときも要素は消さず見た目だけ引っ込める */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  max-width: calc(100vw - 28px);
+  padding: 11px 12px 11px 18px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 700;
+  box-shadow: 0 14px 30px -14px rgba(15, 52, 74, .9);
+  opacity: 0;
+  transform: translate(-50%, 12px);
+  pointer-events: none;
+  transition: opacity .18s, transform .18s;
+}
+
+.toast.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+
+.toast button {
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  color: #bfe6fb;
+  font-size: 14px;
+}
+
+.toast button:focus-visible { outline-color: #bfe6fb; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: none; }
 }

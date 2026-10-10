@@ -3,7 +3,7 @@
 
 // VERSION は手で書かない。scripts/stamp_sw_version.py が ASSETS 実体のハッシュから
 // 打ち直す (手動運用だと JS だけ直したときに install が発火せず古い版が residue する)。
-const VERSION = 'cp-6fa5db706fce';
+const VERSION = 'cp-59658de3ca04';
 // './index.html' は入れない。Vercel の cleanUrls が /index.html → / に 308 する結果
 // リダイレクト済みレスポンスになり、Cache.put が TypeError を投げて install ごと失敗する
 // (= オフラインが一切効かなくなる)。シェルは './' だけを持つ。
@@ -20,6 +20,11 @@ const ASSETS = [
   './js/group.js',
   './js/router.js',
   './js/map.js',
+  './js/progress.js',
+  './js/stopinfo.js',
+  './js/today.js',
+  './js/tabs.js',
+  './js/toast.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',

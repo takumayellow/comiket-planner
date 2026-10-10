@@ -75,7 +75,7 @@ export function dwell(p, layout) {
   return base + WALL_QUEUE + line;
 }
 
-function walk(layout, a, b) {
+export function walk(layout, a, b) {
   return layout.walkMinutes(a, b) * CROWD_WALK_FACTOR;
 }
 

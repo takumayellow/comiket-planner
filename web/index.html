@@ -18,50 +18,121 @@
 </head>
 <body>
 
-<header class="hero">
-  <div class="hero__sky" aria-hidden="true">
-    <i class="cloud cloud--a"></i><i class="cloud cloud--b"></i><i class="cloud cloud--c"></i>
-    <i class="glass"></i>
-    <!-- 東京ビッグサイトの逆四角錐。実写真は再配布できないので、シルエットを自前で
-         描いて空に透かす (会場の建物だと一目で分かる程度の抽象度)。 -->
-    <svg class="hero__bigsight" viewBox="0 0 340 132" preserveAspectRatio="xMidYMax meet"
-      aria-hidden="true" focusable="false">
-      <rect class="bs-cap" x="34" y="18" width="272" height="11" rx="2.5"/>
-      <polygon class="bs-l" points="40,29 72.5,29 72.5,92"/>
-      <polygon class="bs-r" points="72.5,29 105,29 72.5,92"/>
-      <polygon class="bs-l" points="105,29 137.5,29 137.5,92"/>
-      <polygon class="bs-r" points="137.5,29 170,29 137.5,92"/>
-      <polygon class="bs-l" points="170,29 202.5,29 202.5,92"/>
-      <polygon class="bs-r" points="202.5,29 235,29 202.5,92"/>
-      <polygon class="bs-l" points="235,29 267.5,29 267.5,92"/>
-      <polygon class="bs-r" points="267.5,29 300,29 267.5,92"/>
-      <rect class="bs-deck" x="52" y="92" width="236" height="7" rx="1.5"/>
-      <polygon class="bs-leg" points="150,99 190,99 201,126 139,126"/>
-      <rect class="bs-ground" x="8" y="124" width="324" height="3" rx="1.5"/>
-    </svg>
-  </div>
-  <div class="hero__inner">
-    <p class="hero__eyebrow"><span class="hero__tick" aria-hidden="true"></span><span id="meta">コミックマーケット108</span></p>
-    <h1>コミケ<em>巡回</em>プランナー</h1>
-    <p class="hero__lead">
-      行きたいサークルを思いついた順に書くだけ。<br class="br-sp">
-      壁の完売リスク・優先度・ホール間の移動時間を織り込んで、回る順を組み立てます。
-    </p>
-    <dl class="hero__facts">
-      <div><dt>会場</dt><dd id="venue">東京ビッグサイト</dd></div>
-      <div><dt>サークル頒布</dt><dd id="hours">10:30 — 16:00</dd></div>
-      <div><dt>通信</dt><dd>不要（端末内で計算）</dd></div>
-    </dl>
-  </div>
-  <div class="hero__wave" aria-hidden="true">
-    <svg viewBox="0 0 1440 90" preserveAspectRatio="none" focusable="false">
-      <path d="M0,48 C240,92 480,92 720,60 C960,28 1200,28 1440,58 L1440,90 L0,90 Z"/>
-    </svg>
-  </div>
-</header>
+<main id="app">
+  <section class="panel panel--today" id="p-today" role="tabpanel" aria-labelledby="t-today" hidden>
+    <header class="td-head">
+      <div class="td-head__row">
+        <span class="td-chip" id="tdDay">C108</span>
+        <span class="td-chip td-chip--soft">端末内で計算</span>
+      </div>
+      <p class="td-clock"><span class="sr-only">現在時刻 </span><span id="tdClock">--:--</span></p>
+      <div class="td-status">
+        <span class="td-pace" id="tdPace" hidden></span>
+        <span class="td-end" id="tdEnd"></span>
+      </div>
+    </header>
+    <div class="td-body">
+      <div id="tdCard"></div>
+      <section class="td-rest" id="tdRest" hidden>
+        <div class="td-rest__head"><h2>このあと</h2><span id="tdProg"></span></div>
+        <div class="progress"><i id="tdBar"></i></div>
+        <ol class="td-ups" id="tdUpcoming"></ol>
+        <p class="td-none" id="tdNone" hidden>残りはこの1軒だけです。</p>
+      </section>
+    </div>
+  </section>
 
-<main>
-  <div class="col-in">
+  <section class="panel" id="p-route" role="tabpanel" aria-labelledby="t-route" hidden>
+    <section class="card card--rose" id="out" hidden>
+      <h2><span class="eyebrow">RESULT</span>組み上がった1日</h2>
+      <p class="sr-only" id="planLive" aria-live="polite"></p>
+      <div class="summary" id="summary"></div>
+      <div class="progress"><i id="pbar"></i></div>
+      <p class="hint" id="slack"></p>
+      <div class="chips" id="chips"></div>
+    </section>
+
+    <section class="card" id="listsec" hidden>
+      <h2><span class="eyebrow">ROUTE</span>巡回順<span class="sub">押すと消し込み</span></h2>
+      <div id="stops"></div>
+      <div class="btn-row">
+        <button class="btn-sub" type="button" id="resetChk">記録を全部消す</button>
+        <button class="btn-sub" type="button" id="copyBtn">テキストでコピー</button>
+      </div>
+    </section>
+
+    <section id="extra"></section>
+
+    <div class="empty" id="empty">
+      <b>まだ何も組んでいません。</b>
+      「リスト」タブに行きたいサークルを入れて、「巡回順を計算する」を押してください。
+      <button class="btn-sub" type="button" data-go="list">リストを入れる</button>
+    </div>
+  </section>
+
+  <section class="panel" id="p-map" role="tabpanel" aria-labelledby="t-map" hidden>
+    <section class="card card--teal" id="mapsec" hidden>
+      <h2><span class="eyebrow">MAP</span>会場の概略図<span class="sub">点を押すと消し込み</span></h2>
+      <div class="mapwrap" id="mapwrap"></div>
+      <div class="legend">
+        <span><i class="p12"></i>優先1・2</span>
+        <span><i class="p3"></i>優先3</span>
+        <span><i class="p45"></i>優先4・5</span>
+        <span><i class="fin"></i>回った</span>
+        <span><i class="wallmark"></i>壁</span>
+      </div>
+    </section>
+    <button class="map-next" type="button" id="mapNext" data-go="today" hidden></button>
+    <div class="empty" id="mapEmpty">
+      <b>まだ巡回順がありません。</b>
+      巡回順を組むと、立ち寄る場所と順番がここに出ます。
+      <button class="btn-sub" type="button" data-go="list">リストを入れる</button>
+    </div>
+  </section>
+
+  <section class="panel panel--list" id="p-list" role="tabpanel" aria-labelledby="t-list" hidden>
+    <header class="hero">
+      <div class="hero__sky" aria-hidden="true">
+        <i class="cloud cloud--a"></i><i class="cloud cloud--b"></i><i class="cloud cloud--c"></i>
+        <i class="glass"></i>
+        <!-- 東京ビッグサイトの逆四角錐。実写真は再配布できないので、シルエットを自前で
+             描いて空に透かす (会場の建物だと一目で分かる程度の抽象度)。 -->
+        <svg class="hero__bigsight" viewBox="0 0 340 132" preserveAspectRatio="xMidYMax meet"
+          aria-hidden="true" focusable="false">
+          <rect class="bs-cap" x="34" y="18" width="272" height="11" rx="2.5"/>
+          <polygon class="bs-l" points="40,29 72.5,29 72.5,92"/>
+          <polygon class="bs-r" points="72.5,29 105,29 72.5,92"/>
+          <polygon class="bs-l" points="105,29 137.5,29 137.5,92"/>
+          <polygon class="bs-r" points="137.5,29 170,29 137.5,92"/>
+          <polygon class="bs-l" points="170,29 202.5,29 202.5,92"/>
+          <polygon class="bs-r" points="202.5,29 235,29 202.5,92"/>
+          <polygon class="bs-l" points="235,29 267.5,29 267.5,92"/>
+          <polygon class="bs-r" points="267.5,29 300,29 267.5,92"/>
+          <rect class="bs-deck" x="52" y="92" width="236" height="7" rx="1.5"/>
+          <polygon class="bs-leg" points="150,99 190,99 201,126 139,126"/>
+          <rect class="bs-ground" x="8" y="124" width="324" height="3" rx="1.5"/>
+        </svg>
+      </div>
+      <div class="hero__inner">
+        <p class="hero__eyebrow"><span class="hero__tick" aria-hidden="true"></span><span id="meta">コミックマーケット108</span></p>
+        <h1>コミケ<em>巡回</em>プランナー</h1>
+        <p class="hero__lead">
+          行きたいサークルを思いついた順に書くだけ。<br class="br-sp">
+          壁の完売リスク・優先度・ホール間の移動時間を織り込んで、回る順を組み立てます。
+        </p>
+        <dl class="hero__facts">
+          <div><dt>会場</dt><dd id="venue">東京ビッグサイト</dd></div>
+          <div><dt>サークル頒布</dt><dd id="hours">10:30 — 16:00</dd></div>
+          <div><dt>通信</dt><dd>不要（端末内で計算）</dd></div>
+        </dl>
+      </div>
+      <div class="hero__wave" aria-hidden="true">
+        <svg viewBox="0 0 1440 90" preserveAspectRatio="none" focusable="false">
+          <path d="M0,48 C240,92 480,92 720,60 C960,28 1200,28 1440,58 L1440,90 L0,90 Z"/>
+        </svg>
+      </div>
+    </header>
+
     <section class="card card--in">
       <h2><span class="eyebrow">STEP 1</span>行きたいリスト<span class="sub">思いついた順に、話し言葉のままで</span></h2>
 
@@ -137,68 +208,55 @@
         <button type="button" id="installBtn">追加</button>
       </div>
     </section>
-  </div>
 
-  <div class="col-out">
-    <section class="card card--rose" id="out" hidden>
-      <h2><span class="eyebrow">RESULT</span>組み上がった1日</h2>
-      <p class="sr-only" id="planLive" aria-live="polite"></p>
-      <div class="summary" id="summary"></div>
-      <div class="progress"><i id="pbar"></i></div>
-      <p class="hint" id="slack"></p>
-    </section>
-
-    <section class="card card--teal" id="mapsec" hidden>
-      <h2><span class="eyebrow">MAP</span>会場の概略図<span class="sub">番号は立ち寄り順</span></h2>
-      <div class="mapwrap" id="mapwrap"></div>
-      <div class="legend">
-        <span><i class="p12"></i>優先1・2</span>
-        <span><i class="p3"></i>優先3</span>
-        <span><i class="p45"></i>優先4・5</span>
-        <span><i class="wallmark"></i>壁</span>
+    <footer class="site-foot">
+      <span class="site-foot__mark" aria-hidden="true">C108</span>
+      <div class="site-foot__inner">
+        <div>
+          <h3>端末の中だけで動きます</h3>
+          <p>入力したリストはサーバへ送信されず、端末内（localStorage）にだけ保存されます。一度開けば通信がなくても動くので、会場で圏外になっても計算できます。</p>
+        </div>
+        <div>
+          <h3>外へ出るのはこの2つだけ</h3>
+          <p>ひとつは音声入力です。ブラウザの音声認識を使うため、端末内で処理できない環境では音声がブラウザ提供元のサーバへ送られます。文字になった後の処理はすべて端末内です。もうひとつは巡回順に出る「調べる（要通信）」で、押すと地区・ブロック記号・番号を検索サイトへ渡して新しいタブを開きます。どちらも押さなければ通信は起きません。</p>
+        </div>
+        <div>
+          <h3>サークル名は持っていません</h3>
+          <p>配置のデータベースは同梱していません。場所はご自身で調べて入力してください。読み取り結果にサークル名を書き足すと、巡回順とコピーしたテキストに残ります。名前が空の立ち寄りには「調べる（要通信）」のリンクを出しますが、これは検索サイトへ移動するので通信が要ります。</p>
+        </div>
+        <div>
+          <h3>地図と所要時間について</h3>
+          <p>概略図は公式地図の複製ではなく、ホール寸法などから独自に組んだ位置モデルです。所要時間は「大半の島は並ばずに数分、行列は一部だけ」という前提の見積りで、実際は状況で大きく変わります。待機列・入場口・配置の最終確認は必ず公式の発表で行ってください。</p>
+        </div>
       </div>
-    </section>
-
-    <section class="card" id="listsec" hidden>
-      <h2><span class="eyebrow">ROUTE</span>巡回順<span class="sub">押すと消し込み</span></h2>
-      <div id="stops"></div>
-      <div class="btn-row">
-        <button class="btn-sub" type="button" id="resetChk">チェックを全部消す</button>
-        <button class="btn-sub" type="button" id="copyBtn">テキストでコピー</button>
-      </div>
-    </section>
-
-    <section id="extra"></section>
-
-    <div class="empty" id="empty">
-      <b>まだ何も組んでいません。</b>
-      左（上）のリストに行きたいサークルを入れて、「巡回順を計算する」を押してください。
-    </div>
-  </div>
+      <p class="site-foot__end">Comic Market 108 ／ 非公式ツール</p>
+    </footer>
+  </section>
 </main>
 
-<footer class="site-foot">
-  <span class="site-foot__mark" aria-hidden="true">C108</span>
-  <div class="site-foot__inner">
-    <div>
-      <h3>端末の中だけで動きます</h3>
-      <p>入力したリストはサーバへ送信されず、端末内（localStorage）にだけ保存されます。一度開けば通信がなくても動くので、会場で圏外になっても計算できます。</p>
-    </div>
-    <div>
-      <h3>外へ出るのはこの2つだけ</h3>
-      <p>ひとつは音声入力です。ブラウザの音声認識を使うため、端末内で処理できない環境では音声がブラウザ提供元のサーバへ送られます。文字になった後の処理はすべて端末内です。もうひとつは巡回順に出る「調べる（要通信）」で、押すと地区・ブロック記号・番号を検索サイトへ渡して新しいタブを開きます。どちらも押さなければ通信は起きません。</p>
-    </div>
-    <div>
-      <h3>サークル名は持っていません</h3>
-      <p>配置のデータベースは同梱していません。場所はご自身で調べて入力してください。読み取り結果にサークル名を書き足すと、巡回順とコピーしたテキストに残ります。名前が空の立ち寄りには「調べる（要通信）」のリンクを出しますが、これは検索サイトへ移動するので通信が要ります。</p>
-    </div>
-    <div>
-      <h3>地図と所要時間について</h3>
-      <p>概略図は公式地図の複製ではなく、ホール寸法などから独自に組んだ位置モデルです。所要時間は「大半の島は並ばずに数分、行列は一部だけ」という前提の見積りで、実際は状況で大きく変わります。待機列・入場口・配置の最終確認は必ず公式の発表で行ってください。</p>
-    </div>
-  </div>
-  <p class="site-foot__end">Comic Market 108 ／ 非公式ツール</p>
-</footer>
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toastMsg"></span>
+  <button type="button" id="toastUndo">取り消す</button>
+</div>
+
+<nav class="tabbar" role="tablist" aria-label="画面の切り替え">
+  <button class="tab" type="button" role="tab" id="t-today" aria-controls="p-today" aria-selected="false" tabindex="-1" data-tab="today">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+    <b>当日</b><small>次の1軒</small>
+  </button>
+  <button class="tab" type="button" role="tab" id="t-route" aria-controls="p-route" aria-selected="false" tabindex="-1" data-tab="route">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5h12M6 12h12M6 19h12"/><circle cx="3" cy="5" r=".6"/><circle cx="3" cy="12" r=".6"/><circle cx="3" cy="19" r=".6"/></svg>
+    <b>巡回</b><small>全体の順</small>
+  </button>
+  <button class="tab" type="button" role="tab" id="t-map" aria-controls="p-map" aria-selected="false" tabindex="-1" data-tab="map">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>
+    <b>地図</b><small>概略図</small>
+  </button>
+  <button class="tab" type="button" role="tab" id="t-list" aria-controls="p-list" aria-selected="false" tabindex="-1" data-tab="list">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20h4L19.5 9.5a2.1 2.1 0 0 0-3-3L6 17z"/><path d="M14.5 8.5l3 3"/></svg>
+    <b>リスト</b><small>入力</small>
+  </button>
+</nav>
 
 <script type="module" src="./js/app.js"></script>
 </body>

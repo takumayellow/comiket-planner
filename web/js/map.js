@@ -4,6 +4,9 @@
 // スマホで読めることを最優先にしてある:
 //  - ホールごとに1段ずつ縦に積む(横に並べると1メートルあたりの画素が足りず記号が潰れる)
 //  - ブロック記号は「今回行くブロック」だけ大きく出す。全部出すと文字が重なって読めない
+//  - 立ち寄りの丸は押して消し込める。指で狙えるよう、見た目より大きい当たり判定を重ねる
+
+import { isFinished } from './progress.js';
 
 // ビッグサイトは東・西・南で棟が分かれている。南を西に含めず別棟として積む。
 const GROUPS = [
@@ -44,6 +47,9 @@ const C = {
   label: '#5c7c93',
   row: '#2e9fd8',
   link: '#a9c9dc',
+  fin: '#9fbfd2',      // 回り終えた丸。白い番号では淡すぎるので番号は濃紺で載せる
+  finText: '#0d3f5f',
+  next: '#0f4f74',     // 次の1軒を囲む輪
 };
 
 export function stopColor(priority) {
@@ -66,7 +72,12 @@ function bandsFor(layout) {
   return rest.length ? [...GROUPS, { label: 'その他', zones: rest }] : GROUPS;
 }
 
-export function renderMap(layout, plan) {
+/**
+ * @param {object} [opt]
+ * @param {Map} [opt.status] groupKey → 'done'|'sold'|'skip' (回り終えた丸を淡くする)
+ * @param {string|null} [opt.nextKey] 次の1軒 (輪で囲み、少し大きく描く)
+ */
+export function renderMap(layout, plan, { status = new Map(), nextKey = null } = {}) {
   const groups = bandsFor(layout);
   const stops = plan?.stops || [];
   const hit = new Set(stops.map((s) => s.placement.block));
@@ -137,7 +148,7 @@ export function renderMap(layout, plan) {
   out.push('<svg xmlns="http://www.w3.org/2000/svg" '
     + `viewBox="${r(x0)} ${r(y0)} ${r(vw)} ${r(vh)}" `
     + 'width="100%" preserveAspectRatio="xMidYMin meet" '
-    + 'role="img" aria-label="会場の概略図と巡回順">');
+    + 'role="group" aria-label="会場の概略図と巡回順">');
   out.push(`<rect x="${r(x0)}" y="${r(y0)}" width="${r(vw)}" height="${r(vh)}" fill="${C.paper}"/>`);
 
   for (const b of bands) {
@@ -182,18 +193,37 @@ export function renderMap(layout, plan) {
       + `${same ? '' : ` stroke-dasharray="${r(u(6))} ${r(u(4))}"`}/>`);
   }
 
-  // 立ち寄り: 番号の丸 + ブロック記号 (記号を主役にする)
+  // 立ち寄り: 番号の丸 + ブロック記号 (記号を主役にする)。丸ごとに押せる g で包む。
+  // 当たり判定は隣の丸と重なるので、どれを押したかは画面側で中心が一番近い丸に決める
+  // (後から描いた丸の当たり判定が、先の丸の見えている部分を奪わないように)
   nodes.forEach((n, i) => {
+    const p = n.s.placement;
+    const k = p.groupKey;
+    const fin = isFinished(status.get(k));
+    const next = k === nextKey;
+    const rr = next ? MR * 1.25 : MR;
     const up = n.y > n.top + u(4);
-    const ty = up ? n.y - MR - u(4) : n.y + MR + u(13);
+    const ty = up ? n.y - rr - u(4) : n.y + rr + u(13);
+    const hall = layout.hallOf(p.block, p.number) || p.district || '';
+    out.push(`<g class="mk${fin ? ' fin' : ''}${next ? ' next' : ''}" data-k="${esc(k)}" `
+      + `data-x="${r(n.x)}" data-y="${r(n.y)}" role="checkbox" tabindex="0" aria-checked="${fin}" `
+      + `aria-label="${i + 1}軒目 ${esc(hall)} ${esc(p.block)}${p.number}">`);
+    out.push(`<circle class="mk__hit" cx="${r(n.x)}" cy="${r(n.y)}" r="${r(MR * 1.9)}" fill="transparent"/>`);
+    out.push(`<circle class="mk__focus" cx="${r(n.x)}" cy="${r(n.y)}" r="${r(rr + u(7))}" `
+      + `fill="none" stroke-width="${r(u(3))}"/>`);
     out.push(`<text x="${r(n.x)}" y="${r(ty)}" fill="${C.code}" font-size="${r(u(15))}" `
       + `font-weight="700" text-anchor="middle" stroke="${C.paper}" stroke-width="${r(u(3))}" `
-      + `paint-order="stroke">${esc(n.s.placement.block)}</text>`);
-    out.push(`<circle cx="${r(n.x)}" cy="${r(n.y)}" r="${r(MR)}" `
-      + `fill="${stopColor(n.s.placement.priority)}"`
+      + `paint-order="stroke" aria-hidden="true">${esc(p.block)}</text>`);
+    if (next) {
+      out.push(`<circle cx="${r(n.x)}" cy="${r(n.y)}" r="${r(rr + u(3.5))}" fill="none" `
+        + `stroke="${C.next}" stroke-width="${r(u(2.4))}"/>`);
+    }
+    out.push(`<circle cx="${r(n.x)}" cy="${r(n.y)}" r="${r(rr)}" `
+      + `fill="${fin ? C.fin : stopColor(p.priority)}"`
       + `${n.s.wall ? ` stroke="${C.wallHit}" stroke-width="${r(u(2))}"` : ''}/>`);
-    out.push(`<text x="${r(n.x)}" y="${r(n.y + u(4))}" fill="#ffffff" font-size="${r(u(12))}" `
-      + `font-weight="700" text-anchor="middle">${i + 1}</text>`);
+    out.push(`<text x="${r(n.x)}" y="${r(n.y + u(4))}" fill="${fin ? C.finText : '#ffffff'}" `
+      + `font-size="${r(u(12))}" font-weight="700" text-anchor="middle" aria-hidden="true">${i + 1}</text>`);
+    out.push('</g>');
   });
 
   out.push('</svg>');
@@ -254,7 +284,8 @@ function r(v) {
   return Math.round(v * 10) / 10;
 }
 
+// stopinfo.js の esc と同じ。stopinfo.js が本ファイルを読むので、循環させないよう持ち回す
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

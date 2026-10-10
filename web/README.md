@@ -10,15 +10,22 @@
 
 ```
 index.html            画面
-app.css               デザイン（黒×赤・太ゴシック・高密度＝公式カタログ準拠）
+app.css               デザイン（空色×紺、スマホ前提の下部タブ）
 sw.js                 オフライン用の先読みキャッシュ（VERSION を変えると更新される）
 manifest.webmanifest  ホーム画面に追加したときの見え方
 js/catalog.js         入力テキスト → 配置（catalog.py の移植）
 js/layout.js          会場座標モデルと歩行時間（layout.py の移植）
 js/router.js          巡回順の最適化（router.py の移植）
 js/group.js           同じ島をまとめる／連番の畳み込み
+js/freeform.js        自由文を1件ずつに切り分け、優先度を推定（freeform.py の移植）
+js/voice.js           音声入力（ブラウザ内蔵の Web Speech API）
 js/map.js             概略図の SVG 生成
-js/app.js             画面まわり
+js/progress.js        当日の進み具合（次の1軒・予定との差。純粋な計算）
+js/stopinfo.js        立ち寄り1件の表示用の読み替え（巡回・当日・コピーで共通）
+js/today.js           「当日」タブ（次の1軒と3択の記録）
+js/tabs.js            画面下のタブ（当日 / 巡回 / 地図 / リスト）
+js/toast.js           記録を変えたときの知らせと「取り消す」
+js/app.js             画面まわり（上の部品をつなぐ）
 js/layout-data.js     自動生成（scripts/build_web_data.py）
 ```
 
@@ -34,10 +41,17 @@ python scripts/build_web_data.py     # data/layout/c108.json → js/layout-data.
 python scripts/check_web_parity.py > /tmp/py.json
 node   scripts/check_web_parity.mjs > /tmp/js.json
 diff /tmp/py.json /tmp/js.json
+
+# 当日の進み具合などの単体テスト（ディレクトリでなくファイルを渡す）
+node --test tests/web/*.test.mjs
+
+# js/ を足したら sw.js の ASSETS に加えてから VERSION を打ち直す
+python scripts/stamp_sw_version.py
 ```
 
 ローカル確認は `python -m http.server 8777` を `web/` で。Service Worker は
 `http://127.0.0.1` なら安全なオリジンとして扱われるので、オフライン動作もそのまま試せる。
+`?now=2026-08-15T11:20` を付けると、その時刻から時計が進む状態で「当日」タブを確かめられる。
 
 ## 公開してよいものの線引き
 

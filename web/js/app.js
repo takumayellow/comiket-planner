@@ -9,6 +9,13 @@ import { groupByBlock, formatNumbers } from './group.js';
 import { planRoute, pyRound, hhmmToMin, minToHhmm } from './router.js';
 import { renderMap, priorityClass } from './map.js';
 import { isSupported as micOk, createRecorder, localReady } from './voice.js';
+import {
+  STATUS, isFinished, restoreStatus, withStatus, toggledStatus, countBy,
+} from './progress.js';
+import { describeStop, zoneName, buildingClass, esc } from './stopinfo.js';
+import { todayView, renderToday, clockFrom } from './today.js';
+import { createTabs } from './tabs.js';
+import { createToast } from './toast.js';
 
 // サークル名を調べに行くための外部検索。配置のデータベースは同梱していないので
 // (再配布不可)、「場所しか分からない」ときの逃げ道はこれしかない。要通信。
@@ -34,7 +41,7 @@ const CLOSE_MIN = hhmmToMin(CLOSE);
 let state = {
   plan: null,
   groups: new Map(),
-  done: new Set(),
+  status: new Map(), // 立ち寄りごとの結果 (groupKey → 'done'|'sold'|'skip')。並びは記録した順
   unparsed: [],
   entries: [],
   prio: new Map(),   // 推定に納得いかないときの手動上書き (配置キー → 優先度)
@@ -60,8 +67,13 @@ function save() {
   });
 }
 
-function saveDone() {
-  ls(() => localStorage.setItem(`${LS}done`, JSON.stringify([...state.done])));
+// 後回しを押した順を残すため、オブジェクトではなく [キー, 状態] の配列で持つ。
+// 旧版の done が残っていると、消した消し込みが読み直しで復活するので消しておく
+function saveStatus() {
+  ls(() => {
+    localStorage.setItem(`${LS}status`, JSON.stringify([...state.status]));
+    localStorage.removeItem(`${LS}done`);
+  });
 }
 
 function savePrio() {
@@ -89,8 +101,8 @@ function restore() {
   $('#zone').value = get('zone') ?? '';
   const g = get('grp');
   $('#grp').checked = g === null ? true : g === '1';
-  state.done = ls(() => new Set(JSON.parse(get('done') || '[]')), new Set())
-    || new Set();
+  const json = (k) => ls(() => JSON.parse(get(k) || 'null'));
+  state.status = restoreStatus(json('status'), json('done'));
   state.prio = ls(() => new Map(Object.entries(JSON.parse(get('prio') || '{}'))
     .map(([k, v]) => [k, Number(v)])), new Map()) || new Map();
   state.name = ls(() => new Map(Object.entries(JSON.parse(get('name') || '{}'))
@@ -278,10 +290,13 @@ function render(unparsed = state.unparsed) {
   state.unparsed = unparsed;
   const plan = state.plan;
   $('#empty').hidden = !!plan;
+  $('#mapEmpty').hidden = !!plan;
   for (const id of ['#out', '#mapsec', '#listsec']) $(id).hidden = !plan;
   $('#extra').innerHTML = '';
 
   if (!plan) {
+    $('#mapwrap').innerHTML = '';
+    renderTodayPanel();
     if (unparsed.length) {
       $('#extra').innerHTML = notice('bad', '場所を読み取れなかった行',
         unparsed.map(esc));
@@ -313,21 +328,13 @@ function render(unparsed = state.unparsed) {
       + (slack < 15 ? '<b class="warn">ほぼ余裕がありません。</b>' : '');
   }
 
-  // 地図が描けなくても巡回順は出す (会場データにゾーンが増えたときの保険)
-  try {
-    $('#mapwrap').innerHTML = renderMap(layout, plan);
-  } catch {
-    $('#mapwrap').innerHTML = '';
-    $('#mapsec').hidden = true;
-  }
-
-  renderStops();
+  $('#chips').innerHTML = hallChips(plan);
+  renderProgress();
 
   // 押した結果が画面のずっと下に出るので、読み上げ環境には要点だけ知らせる
   // (結果の全文を読み上げると長すぎる。件数と時間が分かれば下へ辿れる)
   $('#planLive').textContent = `巡回順を組みました。${plan.stops.length}件、`
     + `所要 ${pyRound(plan.totalMin)}分、終了めやす ${hhmm(endMin)}。`;
-  syncProgress();
 
   const extra = [];
   if (plan.dropped.length) {
@@ -345,11 +352,129 @@ function render(unparsed = state.unparsed) {
   $('#extra').innerHTML = extra.join('');
 }
 
+// 記録 (買えた/売り切れ/あとで) に関わる表示をまとめて描き直す。
+// 計算はやり直さない (押すたびに巡回順が組み変わると、どこまで回ったか分からなくなる)
+function renderProgress() {
+  renderTodayPanel();   // 地図の「次の1軒」はここで決まるので先に
+  if (state.plan) {
+    renderStops();
+    renderMapPanel();
+  }
+  syncProgress();
+}
+
 function renderStops() {
   const plan = state.plan;
   if (!plan) return;
-  $('#stops').innerHTML = plan.stops.map((s, i) => stopRow(s, i)).join('');
-  bindStops();
+  $('#stops').innerHTML = plan.stops.map((s, i) => xferRow(plan.stops[i - 1], s)
+    + stopRow(s, i)).join('');
+}
+
+// 棟・ホールをまたぐところに区切りを入れる。移動が長いのはここなので目で拾えるように
+function xferRow(prev, s) {
+  if (!prev || prev.point.zone === s.point.zone) return '';
+  return `<div class="xfer"><span>${esc(zoneName(layout, prev.point.zone))} → `
+    + `${esc(zoneName(layout, s.point.zone))}</span>`
+    + `<b>移動 約${Math.round(s.walkFromPrev)}分</b></div>`;
+}
+
+// どのホールを何軒回るか (巡回順で最初に入った順)
+function hallChips(plan) {
+  const count = new Map();
+  for (const s of plan.stops) count.set(s.point.zone, (count.get(s.point.zone) || 0) + 1);
+  return [...count].map(([z, n]) => `<span class="chip ${buildingClass(z)}">`
+    + `${esc(zoneName(layout, z))}<b>${n}軒</b></span>`).join('');
+}
+
+function renderMapPanel() {
+  // 地図が描けなくても巡回順は出す (会場データにゾーンが増えたときの保険)
+  try {
+    $('#mapwrap').innerHTML = renderMap(layout, state.plan, {
+      status: state.status,
+      nextKey: lastView?.next?.key ?? null,
+    });
+    $('#mapsec').hidden = false;
+  } catch {
+    $('#mapwrap').innerHTML = '';
+    $('#mapsec').hidden = true;
+  }
+}
+
+// ---------- 当日 ----------
+
+const clock = clockFrom(location.search);
+let lastView = null;
+
+function renderTodayPanel() {
+  lastView = todayView({
+    plan: state.plan,
+    groups: state.groups,
+    status: state.status,
+    layout,
+    now: clock(),
+    brk: budgetInfo().brk,
+    closeMin: CLOSE_MIN,
+    event: LAYOUT_DOC.event,
+    dates: LAYOUT_DOC.dates,
+  });
+  renderToday($('#p-today'), lastView);
+  renderMapNext(lastView);
+}
+
+// 地図の下の「次はここ」。押すと当日タブへ
+function renderMapNext(v) {
+  const el = $('#mapNext');
+  el.hidden = !v.next;
+  if (!v.next) return;
+  const n = v.next;
+  el.innerHTML = `<span class="map-next__k">次はここ · ${n.no}軒目</span>`
+    + `<b>${esc(n.loc)}</b>`
+    + `<span class="map-next__t">${esc(n.time)} 着の予定 · 当日の画面へ</span>`;
+}
+
+// ---------- 記録 ----------
+// 押し間違いはその場で戻せるよう、変える前の記録を積んでおく
+
+const history = [];
+const HISTORY_MAX = 50;
+const ST_LABEL = { done: '買えた', sold: '売り切れ', skip: 'あとで回る' };
+
+/**
+ * @param {Map} next 新しい記録
+ * @param {string} msg 知らせる文
+ * @param {(()=>Element|null)|null} [refocus] 描き直した後にフォーカスを戻す先
+ */
+function setStatus(next, msg, refocus = null) {
+  history.push(state.status);
+  if (history.length > HISTORY_MAX) history.shift();
+  state.status = next;
+  saveStatus();
+  renderProgress();
+  refocus?.()?.focus();
+  toast.show(msg, () => {
+    const prev = history.pop();
+    if (!prev) return;
+    state.status = prev;
+    saveStatus();
+    renderProgress();
+  });
+}
+
+function stopName(key) {
+  const s = state.plan?.stops.find((x) => x.placement.groupKey === key);
+  return s ? describeStop(s, state.groups, layout).loc : '';
+}
+
+function toggleStop(key, refocus = null) {
+  const next = toggledStatus(state.status, key);
+  const st = next.get(key);
+  setStatus(next, `${stopName(key)} を`
+    + `${st ? `「${ST_LABEL[st]}」にしました` : '未着手に戻しました'}`, refocus);
+}
+
+function resetStatus(refocus = null) {
+  if (!state.status.size) return;
+  setStatus(new Map(), '記録を全部消しました', refocus);
 }
 
 // 展開表示: 島で拾う各サークルを1件ずつ並べる。番号ごとに名前・優先度が対応する
@@ -369,13 +494,14 @@ function memberList(items) {
 }
 
 function stopRow(s, i) {
-  const p = s.placement;
-  const items = state.groups.get(p.groupKey) || [p];
-  const nums = formatNumbers(items.map((x) => x.number));
-  const hall = layout.hallOf(p.block, p.number) || p.district || '';
-  const col = priorityClass(p.priority);   // 色は CSS クラスで当てる (CSP対応)
-  const done = state.done.has(p.groupKey);
-  const labels = [...new Set(items.map((x) => x.label).filter(Boolean))];
+  const d = describeStop(s, state.groups, layout);
+  const { placement: p, items, nums, hall, labels } = d;
+  const col = d.col;   // 色は CSS クラスで当てる (CSP対応)
+  const st = state.status.get(p.groupKey);
+  const done = isFinished(st);
+  // 回り終えた行は .done で薄くし、結果ごとの見た目は .sold / .skip で足す
+  // (買えたは st 自体が 'done' なので重ねない)
+  const cls = [done && st !== 'done' ? 'done' : '', st || ''].filter(Boolean).join(' ');
   // チェックは表示だけを切り替える。外すと島の中を1件ずつ展開する。
   const expand = !$('#grp').checked && items.length > 1;
   // 名前が無いと当日「ここは何だったか」が分からない。書いてあれば太く出し、
@@ -387,7 +513,7 @@ function stopRow(s, i) {
       : `<div class="stop__lab none">名前は未記入</div>
        <a class="stop__find" href="${esc(findUrl(p, nums))}"
          target="_blank" rel="noopener noreferrer">調べる（要通信）</a>`;
-  return `<div class="stop${done ? ' done' : ''}" data-k="${esc(p.groupKey)}">
+  return `<div class="stop${cls ? ` ${cls}` : ''}" data-k="${esc(p.groupKey)}">
     <div class="stop__no">${i + 1}</div>
     <div class="stop__sym ${col}${s.wall ? ' wall' : ''}">
       <b>${esc(p.block)}</b><s>${items.length}件</s></div>
@@ -396,45 +522,34 @@ function stopRow(s, i) {
         <u>${s.wall ? '壁' : '島'}</u>
         <span class="pill ${col}">優先${p.priority}</span></div>
       ${body}
+      ${st ? `<span class="stop__st">${ST_LABEL[st]}</span>` : ''}
     </div>
     <div class="stop__time"><b>${s.arrival}</b>
       <small>${s.walkFromPrev >= 0.5 ? `移動+${Math.round(s.walkFromPrev)}分` : '—'}</small></div>
     <button class="stop__chk" type="button" role="checkbox"
       aria-checked="${done ? 'true' : 'false'}"
-      aria-label="${esc(`${hall} ${p.block}${nums}`)} を回り終えた"><span
+      aria-label="${esc(`${i + 1}軒目 ${hall} ${p.block}${nums}`)}"><span
       aria-hidden="true">✓</span></button>
   </div>`;
 }
 
-function bindStops() {
-  for (const el of document.querySelectorAll('.stop')) {
-    const chk = el.querySelector('.stop__chk');
-    // 消し込みの実体はここの button。行のどこを押しても効くのは指で操作する
-    // ときの都合で、キーボードと読み上げは button だけを辿ればいいようにする。
-    const toggle = () => {
-      const k = el.dataset.k;
-      const on = !state.done.has(k);
-      if (on) state.done.add(k); else state.done.delete(k);
-      el.classList.toggle('done', on);
-      chk.setAttribute('aria-checked', on ? 'true' : 'false');
-      saveDone();
-      syncProgress();
-    };
-    chk.addEventListener('click', (ev) => { ev.stopPropagation(); toggle(); });
-    el.addEventListener('click', (ev) => {
-      // 「調べる」を押しただけで消し込まれると、戻ってきたとき混乱する
-      if (ev.target.closest('.stop__find') || ev.target.closest('.stop__chk')) return;
-      toggle();
-    });
-  }
+// 消し込みの実体は行の中の button。行のどこを押しても効くのは指で操作する
+// ときの都合で、キーボードと読み上げは button だけを辿ればいいようにする。
+// 行は記録のたびに描き直すので、押したのは #stops でまとめて拾う
+function onStopClick(ev) {
+  const row = ev.target.closest('.stop');
+  // 「調べる」を押しただけで消し込まれると、戻ってきたとき混乱する
+  if (!row || ev.target.closest('.stop__find')) return;
+  const k = row.dataset.k;
+  const fromChk = !!ev.target.closest('.stop__chk');
+  toggleStop(k, fromChk
+    ? () => $('#stops').querySelector(`.stop[data-k="${CSS.escape(k)}"] .stop__chk`)
+    : null);
 }
 
 function syncProgress() {
-  const total = state.plan?.stops.length || 0;
-  const keys = new Set((state.plan?.stops || []).map((s) => s.placement.groupKey));
-  let d = 0;
-  for (const k of state.done) if (keys.has(k)) d++;
-  $('#pbar').style.width = total ? `${(d / total) * 100}%` : '0';
+  const c = countBy(state.plan?.stops || [], state.status, (s) => s.placement.groupKey);
+  $('#pbar').style.width = c.total ? `${(c.finished / c.total) * 100}%` : '0';
 }
 
 // itemsHtml は「呼ぶ側で esc 済みの HTML」。中身に色付けを入れたい箇所があるので
@@ -450,26 +565,17 @@ function asText() {
   // 画面の「所要(分)」と同じ丸めにする (Math.round だと1分ずれることがある)
   const head = `巡回順（${plan.stops.length}件 / 約${pyRound(plan.totalMin)}分）`;
   const body = plan.stops.map((s, i) => {
-    const p = s.placement;
-    const items = state.groups.get(p.groupKey) || [p];
-    const hall = layout.hallOf(p.block, p.number) || p.district || '';
-    // 名前は代表1件ではなく、まとめた全件から拾う (島でまとめると名前が消えてしまう)
-    const labels = [...new Set(items.map((x) => x.label).filter(Boolean))];
-    return `${i + 1}. ${s.arrival} ${hall} ${p.block}`
-      + `${formatNumbers(items.map((x) => x.number))}`
-      + `${labels.length ? ` (${labels.join(' / ')})` : ''}`;
+    const { key, loc, labels } = describeStop(s, state.groups, layout);
+    const st = state.status.get(key);
+    return `${i + 1}. ${s.arrival} ${loc}`
+      + `${labels.length ? ` (${labels.join(' / ')})` : ''}`
+      + `${st ? ` [${ST_LABEL[st]}]` : ''}`;
   });
   return [head, ...body].join('\n');
 }
 
 function hhmm(v) {
   return `${String(Math.floor(v / 60) % 24).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
-}
-
-// 属性は必ず " で囲っているが、' も落としておく (囲み方を変えたときの事故防止)
-function esc(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ---------- 起動 ----------
@@ -479,6 +585,9 @@ for (const id of ['#start', '#end']) {
   $(id).min = OPEN;
   $(id).max = CLOSE;
 }
+const toast = createToast($('#toast'));
+const tabs = createTabs({ onShow: (name) => { if (name === 'today') renderTodayPanel(); } });
+const firstVisit = ls(() => localStorage.getItem(`${LS}text`)) === null;
 restore();
 renderBudgetNote();
 $('#meta').textContent = LAYOUT_DOC.event || 'コミックマーケット';
@@ -490,8 +599,70 @@ for (const id of ['#start', '#end']) {
   $(id).max = CLOSE;
 }
 if ($('#text').value.trim()) compute();
+else render([]);
+// 組んだ巡回順があれば当日から。初めて開いたとき (記入例で組んだだけ) は入力から
+tabs.show(state.plan && !firstVisit ? 'today' : 'list');
 
-$('#go').addEventListener('click', compute);
+// 時計。見えていない間は止まっていてよい (戻ったときに描き直す)
+setInterval(() => { if (!document.hidden) renderTodayPanel(); }, 20000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) renderTodayPanel();
+});
+
+$('#go').addEventListener('click', () => {
+  compute();
+  if (!state.plan) return;
+  tabs.show('today');
+  toast.show(`${state.plan.stops.length}軒の巡回順を組みました`);
+});
+$('#stops').addEventListener('click', onStopClick);
+
+// 当日: 次の1軒への3択と、回り終えた後のやり直し。
+// 押した後は次のカードの「買えた」へフォーカスを移す (続けて押せるように)
+const cardFocus = () => $('#tdCard').querySelector('.td-done, [data-act="reset"]');
+$('#tdCard').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'reset') {
+    resetStatus(cardFocus);
+    return;
+  }
+  const k = b.dataset.k;
+  const name = stopName(k);
+  const msg = act === STATUS.SKIP ? `${name} はあとで回ります`
+    : act === STATUS.SOLD ? `${name} は売り切れでした` : `${name} を回りました`;
+  setStatus(withStatus(state.status, k, act), msg, cardFocus);
+});
+
+// 地図: 丸を押すと消し込み。指で押しやすいよう当たり判定を丸より広げてあり、
+// 隣の丸と重なることがある。重なったところでは中心がいちばん近い丸を選ぶ
+function markerAt(ev) {
+  const hit = ev.target.closest('.mk');
+  const svg = ev.target.closest('svg');
+  if (!hit || !svg) return hit;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return hit;
+  const pt = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(ctm.inverse());
+  let best = hit;
+  let bestD = Infinity;
+  for (const g of svg.querySelectorAll('.mk')) {
+    const d = Math.hypot(+g.dataset.x - pt.x, +g.dataset.y - pt.y);
+    if (d < bestD) { best = g; bestD = d; }
+  }
+  return best;
+}
+const markFocus = (k) => () => $('#mapwrap').querySelector(`.mk[data-k="${CSS.escape(k)}"]`);
+$('#mapwrap').addEventListener('click', (ev) => {
+  const g = markerAt(ev);
+  if (g) toggleStop(g.dataset.k);
+});
+$('#mapwrap').addEventListener('keydown', (ev) => {
+  const g = ev.target.closest('.mk');
+  if (!g || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+  ev.preventDefault();
+  toggleStop(g.dataset.k, markFocus(g.dataset.k));
+});
 $('#text').addEventListener('change', save);
 // 打ち込み/貼り付けの途中で巡回順まで作り直すと重いので、読み取り結果だけ追う
 let typing = null;
@@ -518,11 +689,7 @@ for (const b of document.querySelectorAll('[data-fill]')) {
     compute();
   });
 }
-$('#resetChk').addEventListener('click', () => {
-  state.done = new Set();
-  saveDone();
-  render();
-});
+$('#resetChk').addEventListener('click', () => resetStatus());
 $('#copyBtn').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(asText());
